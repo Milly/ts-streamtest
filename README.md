@@ -1,0 +1,154 @@
+# streamtest
+
+**streamtest** is a library for testing streams in [Deno](https://deno.land/).
+Provides helper functions that make it easier to test streams with various
+scenarios and assertions.
+
+Inspired by the test helpers in [RxJS](https://rxjs.dev/).
+
+## Define stream scenarios
+
+A simple string `series` can be used to define values to be enqueued into a
+stream and events such as closes and errors.
+
+### Series format
+
+The following characters are available in the `series`:
+
+- `\x20` : Space is ignored. Used to align columns.
+- `-` : Advance 1 tick.
+- `|` : Close the stream.
+- `#` : Abort the stream.
+- `(...)` : Groups characters. It does not advance ticks inside. After closing
+  `)`, advance 1 tick.
+- Characters with keys in `values` will have their values enqueued to the
+  stream, and then advance 1 tick.
+- Other characters are enqueued into the stream as a single character, and then
+  advance 1 tick.
+
+#### Example for Series format
+
+- Series: `"  ---A--B(CD)--|"`
+- Values: `{ A: "foo" }`
+
+1. Waits 3 ticks.
+2. "foo" is enqueued and waits 1 tick.
+3. Waits 2 ticks.
+4. "B" is enqueued and waits 1 tick.
+5. "C" is enqueued, "D" is enqueued and waits 1 tick.
+6. Waits 2 ticks.
+7. Close the stream.
+
+## API Reference
+
+### `testStream`
+
+Define a block to test streams. `TestStreamHelper` is passed to the function
+specified for `testStream`, which has helper functions available only within
+that function.
+
+```typescript
+import { testStream, type TestStreamHelper } from "./test_stream.ts";
+
+Deno.test("MyTransformer", async () => {
+  await testStream(async (helper: TestStreamHelper) => {
+    // ... test logic using helper.assertReadable, helper.readable, and helper.run ...
+  });
+});
+```
+
+### `readable` helper
+
+Creates a `ReadableStream` with the specified `series`.
+
+```typescript
+import { testStream } from "./test_stream.ts";
+
+Deno.test("readable", async () => {
+  await testStream(async ({ readable }) => {
+    const abortReason = new Error("abort");
+    const values = {
+      A: "foo",
+      B: "bar",
+      C: "baz",
+    } as const;
+
+    // "a" ..sleep.. "b" ..sleep.. "c" ..sleep.. close
+    const characterStream = readable("a--b--c--|");
+
+    // ..sleep.. "foo" ..sleep.. "bar" ..sleep.. "baz" and close
+    const stringStream = readable("   --A--B--(C|)", values);
+
+    // "0" ..sleep.. "1" ..sleep.. "2" ..sleep.. abort
+    const errorStream = readable("    012#", undefined, abortReason);
+
+    // Now you can use the `*Stream` in your test logic.
+  });
+});
+```
+
+### `assertReadable` helper
+
+Asserts that the readable stream matches the specified `series`.
+
+```typescript
+import { testStream } from "./test_stream.ts";
+import { UpperCase } from "./examples/upper_case.ts";
+
+Deno.test("assertReadable", async () => {
+  await testStream(async ({ assertReadable, readable }) => {
+    const abortReason = new Error("abort");
+    const values = {
+      A: "foo",
+      B: "bar",
+      C: "baz",
+    } as const;
+
+    const stream = readable("--A--B--C--#", values, abortReason);
+    const expectedSeries = " --A--B--C--#";
+    const expectedValues = {
+      A: "FOO",
+      B: "BAR",
+      C: "BAZ",
+    };
+
+    const actual = stream.pipeThrough(new UpperCase());
+
+    await assertReadable(actual, expectedSeries, expectedValues, abortReason);
+  });
+});
+```
+
+### `run` helper
+
+Process the test streams inside the `run` block.
+
+```typescript
+import { assertEquals } from "https://deno.land/std/assert/assert_equals.ts";
+import { testStream } from "./test_stream.ts";
+import { UpperCase } from "./examples/upper_case.ts";
+
+Deno.test("run", async () => {
+  await testStream(async ({ run, readable }) => {
+    const stream = readable("--a--b--c--|");
+
+    const actual = stream.pipeThrough(new UpperCase());
+
+    await run([actual], async (actual) => {
+      const reader = actual.getReader();
+
+      assertEquals(await reader.read(), { value: "A", done: false });
+      assertEquals(await reader.read(), { value: "B", done: false });
+      assertEquals(await reader.read(), { value: "C", done: false });
+      assertEquals(await reader.read(), { value: undefined, done: true });
+
+      reader.releaseLock();
+    });
+  });
+});
+```
+
+## License
+
+This library is licensed under the MIT License. See the [LICENSE](./LICENSE)
+file for details.
