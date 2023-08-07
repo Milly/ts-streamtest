@@ -482,13 +482,13 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
   const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
 
   if (series.includes("()")) {
-    throw new TestStreamError(`Empty group: "${series}"`);
+    throw new SyntaxError(`Empty group: "${series}"`);
   }
   if (!/^(?:[^()]+|\([^()]+\))*$/.test(series)) {
-    throw new TestStreamError(`Unmatchd group parentheses: "${series}"`);
+    throw new SyntaxError(`Unmatched group parentheses: "${series}"`);
   }
   if (series && !/^[^#|]*. *\)? *$/.test(series)) {
-    throw new TestStreamError(`Non-trailing close or error: "${series}"`);
+    throw new SyntaxError(`Non-trailing close or error: "${series}"`);
   }
 
   const frames: Frame[] = [];
