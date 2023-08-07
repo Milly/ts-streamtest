@@ -706,11 +706,7 @@ describe("testStream", () => {
               new WritableStream({
                 write(chunk, controller) {
                   if (chunk === "cX") {
-                    console.log(`test: "cX" catched!`);
-                    setTimeout(() => {
-                      console.log(`test: terminate!`);
-                      controller.error("terminate");
-                    }, 50);
+                    setTimeout(() => controller.error("terminate"), 50);
                   }
                 },
               }),
