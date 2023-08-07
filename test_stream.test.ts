@@ -254,6 +254,18 @@ describe("testStream", () => {
           "tickTime cannot go backwards",
         );
       });
+      it("should throws if a float value is specified", () => {
+        assertThrows(
+          () => {
+            testStream({
+              tickTime: 0.5,
+              async fn() {},
+            });
+          },
+          TypeError,
+          "tickTime should be an integer",
+        );
+      });
     });
   });
   describe("TestStreamFn", () => {
