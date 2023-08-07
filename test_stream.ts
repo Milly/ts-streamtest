@@ -218,14 +218,14 @@ type Runner<T = any> = {
   /**
    * Post-process after a tick.
    *
-   * @return `true` if it continues, `false` if it done.
+   * @returns `true` if it continues, `false` if it done.
    */
   postTick(): boolean;
 
   /**
    * Returns the processing log of the stream.
    *
-   * @return The processing log.
+   * @returns The processing log.
    */
   correctLog(): readonly Frame[];
 };
