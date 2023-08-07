@@ -609,6 +609,69 @@ describe("testStream", () => {
             assertEquals(actual, []);
           });
         });
+        for (
+          const series of [
+            "()",
+            "abc()|",
+          ]
+        ) {
+          it(`should throws if empty parentheses: ${toPrint(series)}`, async () => {
+            // deno-lint-ignore require-await
+            await testStream(async ({ readable }) => {
+              assertThrows(
+                () => {
+                  readable(series);
+                },
+                SyntaxError,
+                "Empty group",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            "(",
+            ")",
+            "ab(c|",
+            "ab)c|",
+          ]
+        ) {
+          it(`should throws if parentheses unmatched: ${toPrint(series)}`, async () => {
+            // deno-lint-ignore require-await
+            await testStream(async ({ readable }) => {
+              assertThrows(
+                () => {
+                  readable(series);
+                },
+                SyntaxError,
+                "Unmatched group parentheses",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            "ab|c",
+            "a(|b)",
+            "ab#c",
+            "a(#b)",
+            "abc|#",
+            "abc#|",
+          ]
+        ) {
+          it(`should throws if non-trailing close or error: ${toPrint(series)}`, async () => {
+            // deno-lint-ignore require-await
+            await testStream(async ({ readable }) => {
+              assertThrows(
+                () => {
+                  readable(series);
+                },
+                SyntaxError,
+                "Non-trailing close or error",
+              );
+            });
+          });
+        }
         it("should ignores ` `", async () => {
           await testStream(async ({ readable, run }) => {
             const stream = readable("   a   b c  |   ");
