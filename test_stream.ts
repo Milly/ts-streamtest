@@ -611,9 +611,8 @@ function createRunnerFromFrames(
           break;
         }
         case "error": {
-          const error = value !== NO_VALUE ? value : "error";
-          controller.error(error);
-          addLog({ type, value: error });
+          controller.error(value);
+          addLog({ type, value });
           done = true;
           break;
         }
