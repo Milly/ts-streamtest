@@ -53,7 +53,10 @@ specified for `testStream`, which has helper functions available only within
 that function.
 
 ```typescript
-import { testStream, type TestStreamHelper } from "./test_stream.ts";
+import {
+  testStream,
+  type TestStreamHelper,
+} from "https://deno.land/x/streamtest/test_stream.ts";
 
 Deno.test("MyTransformer", async () => {
   await testStream(async (helper: TestStreamHelper) => {
@@ -67,7 +70,7 @@ Deno.test("MyTransformer", async () => {
 Creates a `ReadableStream` with the specified `series`.
 
 ```typescript
-import { testStream } from "./test_stream.ts";
+import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
 
 Deno.test("readable", async () => {
   await testStream(async ({ readable }) => {
@@ -97,8 +100,8 @@ Deno.test("readable", async () => {
 Asserts that the readable stream matches the specified `series`.
 
 ```typescript
-import { testStream } from "./test_stream.ts";
-import { UpperCase } from "./examples/upper_case.ts";
+import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts";
 
 Deno.test("assertReadable", async () => {
   await testStream(async ({ assertReadable, readable }) => {
@@ -130,8 +133,8 @@ Process the test streams inside the `run` block.
 
 ```typescript
 import { assertEquals } from "https://deno.land/std/assert/assert_equals.ts";
-import { testStream } from "./test_stream.ts";
-import { UpperCase } from "./examples/upper_case.ts";
+import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts";
 
 Deno.test("run", async () => {
   await testStream(async ({ run, readable }) => {
