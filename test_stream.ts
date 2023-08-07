@@ -30,7 +30,7 @@ let testStreamLocked = false;
 let currentTestStreamId = -1;
 
 /** Global stream ID counter. For debugging. */
-let nextStreamId = -1;
+let nextStreamId = 0;
 
 /** The arguments for the `testStream` function. */
 export type TestStreamArgs =
@@ -251,7 +251,7 @@ type MutableTuple<T extends readonly unknown[]> =
  */
 export function testStream(...args: TestStreamArgs): Promise<void> {
   const testStreamId = ++currentTestStreamId;
-  logger().debug("testStream(): start", { testStreamId });
+  logger().debug("testStream(): start", { testStreamId: currentTestStreamId });
 
   const { fn, tickTime, maxTicks } = testStreamDefinition(args);
 
@@ -327,6 +327,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       // Abort when the execution block is disposed.
       if (disposed) break;
 
+      logger().debug("processAllTicks(): postTick", { testStreamId });
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
       await time.runMicrotasks();
@@ -334,7 +335,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       if (!results.includes(true)) break;
     }
 
-    logger().debug("processAllTicks(): end", { testStreamId });
+    logger().debug("processAllTicks(): end", { testStreamId, disposed });
   };
 
   /** `readable` helper. */
@@ -343,7 +344,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   ): ReadableStream => {
     logger().debug("createReadable(): call", {
       testStreamId,
-      id: nextStreamId,
+      streamId: nextStreamId,
       streamArgs,
     });
     const [series, values, error] = streamArgs;
@@ -564,8 +565,12 @@ function createRunnerFromFrames(
   frames: readonly Frame[],
   maxTicks: number,
 ): Runner {
-  const id = nextStreamId++;
-  logger().debug("createRunnerFromFrames(): call", { id, frames });
+  const streamId = nextStreamId++;
+  logger().debug("createRunnerFromFrames(): call", {
+    testStreamId: currentTestStreamId,
+    streamId,
+    frames,
+  });
 
   const { readable, controller, cancelSignal } = createControllReadable();
   const log: Frame[] = [];
@@ -575,7 +580,11 @@ function createRunnerFromFrames(
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger().debug("createRunnerFromFrames(): add", { id, frame });
+    logger().debug("createRunnerFromFrames(): add", {
+      testStreamId: currentTestStreamId,
+      streamId,
+      frame,
+    });
   };
 
   const tick = (): void => {
@@ -587,8 +596,8 @@ function createRunnerFromFrames(
     }
     while (frames[frameIndex]?.type === "enqueue") {
       const { type, value } = frames[frameIndex++];
-      controller.enqueue(value);
       addLog({ type, value });
+      controller.enqueue(value);
     }
     if (frameIndex >= frames.length) {
       done = true;
@@ -599,7 +608,10 @@ function createRunnerFromFrames(
         case "tick": {
           addLog({ type });
           if (++tickCount >= maxTicks) {
-            logger().debug("createRunnerFromFrames(): exceeded", { id });
+            logger().debug("createRunnerFromFrames(): exceeded", {
+              testStreamId: currentTestStreamId,
+              streamId,
+            });
             controller.error(
               new MaxTicksExceededError("Ticks exceeded", {
                 cause: { maxTicks },
@@ -610,14 +622,14 @@ function createRunnerFromFrames(
           break;
         }
         case "close": {
-          controller.close();
           addLog({ type });
+          controller.close();
           done = true;
           break;
         }
         case "error": {
-          controller.error(value);
           addLog({ type, value });
+          controller.error(value);
           done = true;
           break;
         }
@@ -641,15 +653,18 @@ function createRunnerFromFrames(
 
   const correctLog = (): Frame[] => log;
 
-  return { id, readable, tick, postTick, correctLog };
+  return { id: streamId, readable, tick, postTick, correctLog };
 }
 
 function createRunnerFromStream<T>(
   source: ReadableStream<T>,
   maxTicks: number,
 ): Runner<T> {
-  const id = nextStreamId++;
-  logger().debug("createRunnerFromStream(): call", { id });
+  const streamId = nextStreamId++;
+  logger().debug("createRunnerFromStream(): call", {
+    testStreamId: currentTestStreamId,
+    streamId,
+  });
 
   const abortController = new AbortController();
   const { signal } = abortController;
@@ -660,7 +675,11 @@ function createRunnerFromStream<T>(
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger().debug("createRunnerFromStream(): add", { id, frame });
+    logger().debug("createRunnerFromStream(): add", {
+      testStreamId: currentTestStreamId,
+      streamId,
+      frame,
+    });
   };
 
   const readable = new ReadableStream<T>({
@@ -699,7 +718,10 @@ function createRunnerFromStream<T>(
     if (done) return false;
     addLog({ type: "tick" });
     if (++tickCount >= maxTicks) {
-      logger().debug("createRunnerFromStream(): exceeded", { id });
+      logger().debug("createRunnerFromStream(): exceeded", {
+        testStreamId: currentTestStreamId,
+        streamId,
+      });
       abortController.abort(
         new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
       );
@@ -710,7 +732,7 @@ function createRunnerFromStream<T>(
 
   const correctLog = (): Frame[] => log;
 
-  return { id, readable, tick, postTick, correctLog };
+  return { id: streamId, readable, tick, postTick, correctLog };
 }
 
 function assertFramesEquals(
