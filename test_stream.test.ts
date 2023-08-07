@@ -16,7 +16,10 @@ import {
   assertThrows,
 } from "https://deno.land/std@0.197.0/assert/mod.ts";
 import { delay } from "https://deno.land/std@0.197.0/async/delay.ts";
-import { OperationNotPermittedError, TestStreamError } from "./errors/mod.ts";
+import {
+  MaxTicksExceededError,
+  OperationNotPermittedError,
+} from "./errors/mod.ts";
 import {
   testStream,
   type TestStreamHelper,
@@ -115,8 +118,8 @@ describe("testStream", () => {
                 () => {
                   return stream.pipeTo(writable);
                 },
-                TestStreamError,
-                "Too many ticks",
+                MaxTicksExceededError,
+                "Ticks exceeded",
               );
             });
 
@@ -143,8 +146,8 @@ describe("testStream", () => {
                 () => {
                   return stream.pipeTo(writable);
                 },
-                TestStreamError,
-                "Too many ticks",
+                MaxTicksExceededError,
+                "Ticks exceeded",
               );
             });
 

@@ -9,7 +9,10 @@ import { assertEquals } from "https://deno.land/std@0.197.0/assert/assert_equals
 import { AssertionError } from "https://deno.land/std@0.197.0/assert/assertion_error.ts";
 import { FakeTime } from "https://deno.land/std@0.197.0/testing/time.ts";
 import { getLogger } from "https://deno.land/std@0.197.0/log/mod.ts";
-import { OperationNotPermittedError, TestStreamError } from "./errors/mod.ts";
+import {
+  MaxTicksExceededError,
+  OperationNotPermittedError,
+} from "./errors/mod.ts";
 
 function logger() {
   return getLogger("testStream");
@@ -598,7 +601,9 @@ function createRunnerFromFrames(
           if (++tickCount >= maxTicks) {
             logger().debug("createRunnerFromFrames(): exceeded", { id });
             controller.error(
-              new TestStreamError("Too many ticks", { cause: { maxTicks } }),
+              new MaxTicksExceededError("Ticks exceeded", {
+                cause: { maxTicks },
+              }),
             );
             done = true;
           }
@@ -708,7 +713,7 @@ function createRunnerFromStream<T>(
       if (++tickCount >= maxTicks) {
         logger().debug("createRunnerFromStream(): exceeded", { id });
         abortController.abort(
-          new TestStreamError("Too many ticks", { cause: { maxTicks } }),
+          new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
         );
         done = true;
       }
