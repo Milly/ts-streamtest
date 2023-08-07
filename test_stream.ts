@@ -101,6 +101,8 @@ export interface TestStreamHelperAssertReadable {
    * @param [expectedValues] The record object to replace values for each character in `expectedSeries`.
    * @param [expectedError] The value that replaces the reason when the stream aborts.
    * @returns A promise that resolves when the assertion is complete.
+   * @throws {SyntaxError} `series` is invalid format.
+   * @throws {OperationNotPermittedError} Called concurrently or outside `testStream`.
    */
   <T>(
     actual: ReadableStream<T>,
@@ -149,6 +151,8 @@ export interface TestStreamHelperReadable {
    * @param [values] The store of values that replace chunks in the `series`.
    * @param [error] The value that replaces the reason when the stream aborts.
    * @returns The created ReadableStream.
+   * @throws {SyntaxError} `series` is invalid format.
+   * @throws {OperationNotPermittedError} Called concurrently or outside `testStream`.
    */
   (
     series: string,
@@ -170,6 +174,7 @@ export interface TestStreamHelperRun {
    * @param streams Array of streams to process.
    * @param fn The `run` block in which the test streams are processed.
    * @returns A promise that resolves when the `run` block is complete.
+   * @throws {OperationNotPermittedError} Called concurrently or outside `testStream`.
    */
   <T extends readonly [ReadableStream] | readonly ReadableStream[]>(
     streams: T,
@@ -240,6 +245,7 @@ type MutableTuple<T extends readonly unknown[]> =
  *
  * @param args The arguments for the `testStream` function.
  * @returns A promise that resolves when the `testStream` block is complete.
+ * @throws {RangeError} Invalid option values.
  */
 export function testStream(...args: TestStreamArgs): Promise<void> {
   const testStreamId = ++currentTestStreamId;
