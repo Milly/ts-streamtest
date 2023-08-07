@@ -1,69 +1,45 @@
-// deno-lint-ignore-file no-unused-vars require-await
+import { assertExists } from "https://deno.land/std@0.197.0/assert/mod.ts";
 
-import { assertEquals } from "https://deno.land/std@0.197.0/assert/assert_equals.ts";
-import { testStream } from "./test_stream.ts";
-import { UpperCase } from "./examples/upper_case.ts";
+const FILES = ["README.md"];
 
-Deno.test("readable", async () => {
-  await testStream(async ({ readable }) => {
-    const abortReason = new Error("abort");
-    const values = {
-      A: "foo",
-      B: "bar",
-      C: "baz",
-    } as const;
-
-    // "a" ..sleep.. "b" ..sleep.. "c" ..sleep.. close
-    const characterStream = readable("a--b--c--|");
-
-    // ..sleep.. "foo" ..sleep.. "bar" ..sleep.. "baz" and close
-    const stringStream = readable("   --A--B--(C|)", values);
-
-    // "0" ..sleep.. "1" ..sleep.. "2" ..sleep.. abort
-    const errorStream = readable("    012#", undefined, abortReason);
-
-    // Now you can use the `*Stream` in your test logic.
+for (const file of FILES) {
+  Deno.test(file, async (t) => {
+    for await (const { subject, codeBlock } of findCodeBlocks(file)) {
+      await t.step(subject, async (t) => {
+        await t.step("should importable", async () => {
+          const mod = await evalCode(codeBlock);
+          assertExists(mod);
+        });
+      });
+    }
   });
-});
+}
 
-Deno.test("assertReadable", async () => {
-  await testStream(async ({ assertReadable, readable }) => {
-    const abortReason = new Error("abort");
-    const values = {
-      A: "foo",
-      B: "bar",
-      C: "baz",
-    } as const;
+for (const file of FILES) {
+  for await (const { codeBlock } of findCodeBlocks(file)) {
+    try {
+      await evalCode(codeBlock);
+    } catch {
+      // Do nothing.
+    }
+  }
+}
 
-    const stream = readable("--A--B--C--#", values, abortReason);
-    const expectedSeries = " --A--B--C--#";
-    const expectedValues = {
-      A: "FOO",
-      B: "BAR",
-      C: "BAZ",
-    };
+async function* findCodeBlocks(file: string) {
+  const decoder = new TextDecoder("utf-8");
+  const markdown = decoder.decode(await Deno.readFile(file));
+  const codeReg = /^```(?:typescript|ts)\n(.*?)```/dgms;
+  let lastIndex = 0;
+  for (const { 1: codeBlock, indices } of markdown.matchAll(codeReg)) {
+    const [start, end] = indices![0];
+    const { 1: subject } =
+      ("\n" + markdown.slice(lastIndex, start)).match(/.*\n#+ ([^\n]+)/s) ??
+        { 1: "UNKNOWN" };
+    lastIndex = end;
+    yield { subject, codeBlock };
+  }
+}
 
-    const actual = stream.pipeThrough(new UpperCase());
-
-    await assertReadable(actual, expectedSeries, expectedValues, abortReason);
-  });
-});
-
-Deno.test("run", async () => {
-  await testStream(async ({ run, readable }) => {
-    const stream = readable("--a--b--c--|");
-
-    const actual = stream.pipeThrough(new UpperCase());
-
-    await run([actual], async (actual) => {
-      const reader = actual.getReader();
-
-      assertEquals(await reader.read(), { value: "A", done: false });
-      assertEquals(await reader.read(), { value: "B", done: false });
-      assertEquals(await reader.read(), { value: "C", done: false });
-      assertEquals(await reader.read(), { value: undefined, done: true });
-
-      reader.releaseLock();
-    });
-  });
-});
+function evalCode(code: string): Promise<unknown> {
+  return import(`data:application/typescript,${encodeURIComponent(code)}`);
+}

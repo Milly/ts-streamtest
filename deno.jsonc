@@ -4,7 +4,7 @@
     "cache": "deno cache **/*.ts",
     "check": "deno lint && deno fmt --check && deno check **/*.ts",
     "coverage": "deno coverage .coverage --lcov > coverage.lcov",
-    "test": "deno test --doc --coverage=.coverage",
+    "test": "deno test --allow-net --allow-read --doc --coverage=.coverage",
     "update": "deno run -A https://deno.land/x/udd/main.ts **/*.ts"
   }
 }
