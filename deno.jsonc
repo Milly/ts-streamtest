@@ -6,6 +6,7 @@
     "coverage": "deno coverage .coverage --lcov > coverage.lcov",
     "test": "deno test --allow-net --allow-read --doc",
     "testcov": "deno task test --coverage=.coverage",
+    "testlog": "TESTLOG=1 deno task test --allow-env",
     "update": "deno run -A https://deno.land/x/udd/main.ts **/*.ts"
   }
 }

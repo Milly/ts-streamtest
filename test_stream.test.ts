@@ -1,4 +1,8 @@
-import { describe, it } from "https://deno.land/std@0.197.0/testing/bdd.ts";
+import {
+  beforeEach,
+  describe,
+  it,
+} from "https://deno.land/std@0.197.0/testing/bdd.ts";
 import {
   assertSpyCalls,
   spy,
@@ -15,6 +19,7 @@ import {
   assertStrictEquals,
   assertThrows,
 } from "https://deno.land/std@0.197.0/assert/mod.ts";
+import * as log from "https://deno.land/std@0.197.0/log/mod.ts";
 import { delay } from "https://deno.land/std@0.197.0/async/delay.ts";
 import {
   MaxTicksExceededError,
@@ -27,6 +32,37 @@ import {
   type TestStreamHelperReadable,
   type TestStreamHelperRun,
 } from "./test_stream.ts";
+
+let baseTime = Date.now();
+try {
+  if (Deno.env.has("TESTLOG")) {
+    log.setup({
+      handlers: {
+        console: new log.handlers.ConsoleHandler("DEBUG", {
+          formatter({ datetime, levelName, msg, args }) {
+            return [
+              ((datetime.getTime() - baseTime) / 1000).toFixed(3),
+              levelName,
+              msg,
+              ":",
+              Deno.inspect(args, { colors: true }),
+            ].join(" ");
+          },
+        }),
+      },
+      loggers: {
+        testStream: {
+          level: "DEBUG",
+          handlers: ["console"],
+        },
+      },
+    });
+  }
+} catch (e: unknown) {
+  if (!(e instanceof Deno.errors.PermissionDenied)) {
+    throw e;
+  }
+}
 
 class MyCustomError extends Error {
   override name = "MyCustomError";
@@ -50,6 +86,9 @@ function toPrint(value: unknown): string {
 }
 
 describe("testStream", () => {
+  beforeEach(() => {
+    baseTime = Date.now();
+  });
   describe("arguments", () => {
     describe("(options)", () => {
       it("should call `options.fn`", async () => {
