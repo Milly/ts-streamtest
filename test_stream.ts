@@ -9,7 +9,10 @@ import { assertEquals } from "https://deno.land/std@0.197.0/assert/assert_equals
 import { AssertionError } from "https://deno.land/std@0.197.0/assert/assertion_error.ts";
 import { FakeTime } from "https://deno.land/std@0.197.0/testing/time.ts";
 import { getLogger } from "https://deno.land/std@0.197.0/log/mod.ts";
-import { OperationNotPermittedError, TestStreamError } from "./errors/mod.ts";
+import {
+  MaxTicksExceededError,
+  OperationNotPermittedError,
+} from "./errors/mod.ts";
 
 function logger() {
   return getLogger("testStream");
@@ -18,7 +21,6 @@ function logger() {
 const DEFAULT_TICK_TIME = 100;
 const DEFAULT_MAX_TICKS = 50;
 
-const NO_VALUE = Object.freeze(new (class NoValue {})());
 const ANY_VALUE = Object.freeze(new (class AnyValue {})());
 
 /** Flag to prevent concurrent calls. */
@@ -327,6 +329,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
+      await time.runMicrotasks();
 
       if (!results.includes(true)) break;
     }
@@ -598,7 +601,9 @@ function createRunnerFromFrames(
           if (++tickCount >= maxTicks) {
             logger().debug("createRunnerFromFrames(): exceeded", { id });
             controller.error(
-              new TestStreamError("Too many ticks", { cause: { maxTicks } }),
+              new MaxTicksExceededError("Ticks exceeded", {
+                cause: { maxTicks },
+              }),
             );
             done = true;
           }
@@ -611,9 +616,8 @@ function createRunnerFromFrames(
           break;
         }
         case "error": {
-          const error = value !== NO_VALUE ? value : "error";
-          controller.error(error);
-          addLog({ type, value: error });
+          controller.error(value);
+          addLog({ type, value });
           done = true;
           break;
         }
@@ -651,8 +655,6 @@ function createRunnerFromStream<T>(
   const { signal } = abortController;
   const log: Frame[] = [];
   let done = false;
-  let chunks: unknown[] = [];
-  let error = NO_VALUE;
   let closed = false;
   let tickCount = 0;
 
@@ -666,18 +668,21 @@ function createRunnerFromStream<T>(
       source.pipeTo(
         new WritableStream<T>({
           write(chunk) {
-            chunks.push(chunk);
+            addLog({ type: "enqueue", value: chunk });
             controller.enqueue(chunk);
           },
           close() {
             closed = true;
+            done = true;
+            addLog({ type: "close" });
             controller.close();
           },
         }),
         { signal },
       ).catch((e) => {
-        if (!closed) {
-          error = e;
+        if (!closed && !(e instanceof MaxTicksExceededError)) {
+          done = true;
+          addLog({ type: "error", value: e });
           controller.error(e);
         }
       });
@@ -692,27 +697,13 @@ function createRunnerFromStream<T>(
 
   const postTick = (): boolean => {
     if (done) return false;
-    if (chunks.length) {
-      for (const value of chunks) {
-        addLog({ type: "enqueue", value });
-      }
-      chunks = [];
-    }
-    if (error !== NO_VALUE) {
-      addLog({ type: "error", value: error });
+    addLog({ type: "tick" });
+    if (++tickCount >= maxTicks) {
+      logger().debug("createRunnerFromStream(): exceeded", { id });
+      abortController.abort(
+        new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
+      );
       done = true;
-    } else if (closed) {
-      addLog({ type: "close" });
-      done = true;
-    } else {
-      addLog({ type: "tick" });
-      if (++tickCount >= maxTicks) {
-        logger().debug("createRunnerFromStream(): exceeded", { id });
-        abortController.abort(
-          new TestStreamError("Too many ticks", { cause: { maxTicks } }),
-        );
-        done = true;
-      }
     }
     return !done;
   };
