@@ -762,12 +762,9 @@ function assertFramesEquals(
   try {
     assertEquals(actualFrames, expectedFrames, "\0");
   } catch (e: unknown) {
-    if (e instanceof AssertionError) {
-      // Fix error message.
-      throw new AssertionError(
-        e.message.replace(/^.*?\0/, "Stream not matched"),
-      );
-    }
-    throw e;
+    // Fix error message.
+    throw new AssertionError(
+      (e as Error).message.replace(/^.*?\0/, "Stream not matched"),
+    );
   }
 }
