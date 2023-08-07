@@ -21,7 +21,6 @@ function logger() {
 const DEFAULT_TICK_TIME = 100;
 const DEFAULT_MAX_TICKS = 50;
 
-const NO_VALUE = Object.freeze(new (class NoValue {})());
 const ANY_VALUE = Object.freeze(new (class AnyValue {})());
 
 /** Flag to prevent concurrent calls. */
@@ -330,6 +329,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
+      await time.runMicrotasks();
 
       if (!results.includes(true)) break;
     }
@@ -655,8 +655,6 @@ function createRunnerFromStream<T>(
   const { signal } = abortController;
   const log: Frame[] = [];
   let done = false;
-  let chunks: unknown[] = [];
-  let error = NO_VALUE;
   let closed = false;
   let tickCount = 0;
 
@@ -670,18 +668,21 @@ function createRunnerFromStream<T>(
       source.pipeTo(
         new WritableStream<T>({
           write(chunk) {
-            chunks.push(chunk);
+            addLog({ type: "enqueue", value: chunk });
             controller.enqueue(chunk);
           },
           close() {
             closed = true;
+            done = true;
+            addLog({ type: "close" });
             controller.close();
           },
         }),
         { signal },
       ).catch((e) => {
-        if (!closed) {
-          error = e;
+        if (!closed && !(e instanceof MaxTicksExceededError)) {
+          done = true;
+          addLog({ type: "error", value: e });
           controller.error(e);
         }
       });
@@ -696,27 +697,13 @@ function createRunnerFromStream<T>(
 
   const postTick = (): boolean => {
     if (done) return false;
-    if (chunks.length) {
-      for (const value of chunks) {
-        addLog({ type: "enqueue", value });
-      }
-      chunks = [];
-    }
-    if (error !== NO_VALUE) {
-      addLog({ type: "error", value: error });
+    addLog({ type: "tick" });
+    if (++tickCount >= maxTicks) {
+      logger().debug("createRunnerFromStream(): exceeded", { id });
+      abortController.abort(
+        new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
+      );
       done = true;
-    } else if (closed) {
-      addLog({ type: "close" });
-      done = true;
-    } else {
-      addLog({ type: "tick" });
-      if (++tickCount >= maxTicks) {
-        logger().debug("createRunnerFromStream(): exceeded", { id });
-        abortController.abort(
-          new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
-        );
-        done = true;
-      }
     }
     return !done;
   };

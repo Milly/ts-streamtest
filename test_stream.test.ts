@@ -554,6 +554,176 @@ describe("testStream", () => {
           });
         }
       });
+      it("should match the stream created by `readable`", async () => {
+        await testStream(async ({ assertReadable, readable }) => {
+          const stream = readable("abcd|");
+
+          await assertReadable(stream, "abcd|");
+        });
+      });
+      it("should match the stream tansformed from `readable`", async () => {
+        await testStream(async ({ assertReadable, readable }) => {
+          const stream = readable("abcd|");
+
+          const transformed = stream.pipeThrough(
+            new TransformStream({
+              transform(chunk, controller) {
+                controller.enqueue(`${chunk}X`);
+              },
+            }),
+          );
+
+          await assertReadable(transformed, "ABCD|", {
+            A: "aX",
+            B: "bX",
+            C: "cX",
+            D: "dX",
+          });
+        });
+      });
+      it("should match the stream processed with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          await run([stream], async (stream) => {
+            await stream.pipeTo(
+              new WritableStream(),
+            );
+          });
+
+          await assertReadable(stream, "abcd|");
+        });
+      });
+      it("should match the stream aborted with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          await run([stream], async (stream) => {
+            await stream.pipeTo(
+              new WritableStream({
+                write(chunk, controller) {
+                  if (chunk === "c") {
+                    controller.error("terminate");
+                  }
+                },
+              }),
+            ).catch(() => {});
+          });
+
+          await assertReadable(stream, "ab(c#)", undefined, "terminate");
+        });
+      });
+      it("should match the stream asynchronously aborted with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          await run([stream], async (stream) => {
+            await stream.pipeTo(
+              new WritableStream({
+                write(chunk, controller) {
+                  if (chunk === "c") {
+                    setTimeout(() => controller.error("terminate"), 50);
+                  }
+                },
+              }),
+            ).catch(() => {});
+          });
+
+          await assertReadable(stream, "abc#", undefined, "terminate");
+        });
+      });
+      it("should match the stream transformed from `readable` and processed with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          const transformed = stream.pipeThrough(
+            new TransformStream({
+              transform(chunk, controller) {
+                controller.enqueue(`${chunk}X`);
+              },
+            }),
+          );
+
+          await run([transformed], async (transformed) => {
+            await transformed.pipeTo(
+              new WritableStream(),
+            );
+          });
+
+          await assertReadable(transformed, "ABCD|", {
+            A: "aX",
+            B: "bX",
+            C: "cX",
+            D: "dX",
+          });
+        });
+      });
+      it("should match the stream transformed from `readable` and aborted with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          const transformed = stream.pipeThrough(
+            new TransformStream({
+              transform(chunk, controller) {
+                controller.enqueue(`${chunk}X`);
+              },
+            }),
+          );
+
+          await run([transformed], async (transformed) => {
+            await transformed.pipeTo(
+              new WritableStream({
+                write(chunk, controller) {
+                  if (chunk === "cX") {
+                    controller.error("terminate");
+                  }
+                },
+              }),
+            ).catch(() => {});
+          });
+
+          await assertReadable(transformed, "AB(C#)", {
+            A: "aX",
+            B: "bX",
+            C: "cX",
+          }, "terminate");
+        });
+      });
+      it("should match the stream transformed from `readable` and asynchronously aborted with `run`", async () => {
+        await testStream(async ({ assertReadable, readable, run }) => {
+          const stream = readable("abcd|");
+
+          const transformed = stream.pipeThrough(
+            new TransformStream({
+              transform(chunk, controller) {
+                controller.enqueue(`${chunk}X`);
+              },
+            }),
+          );
+
+          await run([transformed], async (transformed) => {
+            await transformed.pipeTo(
+              new WritableStream({
+                write(chunk, controller) {
+                  if (chunk === "cX") {
+                    console.log(`test: "cX" catched!`);
+                    setTimeout(() => {
+                      console.log(`test: terminate!`);
+                      controller.error("terminate");
+                    }, 50);
+                  }
+                },
+              }),
+            ).catch(() => {});
+          });
+
+          await assertReadable(transformed, "ABC#", {
+            A: "aX",
+            B: "bX",
+            C: "cX",
+          }, "terminate");
+        });
+      });
     });
     describe(".readable", () => {
       it("should returns a readable stream", async () => {
