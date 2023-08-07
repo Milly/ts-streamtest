@@ -53,7 +53,7 @@ jobs:
       - name: Cache
         run: deno task cache
       - name: Test
-        run: deno task test
+        run: deno task testcov
       - name: Coverage
         run: deno task coverage
       - uses: codecov/codecov-action@v3
