@@ -22,6 +22,7 @@ import {
 import * as log from "https://deno.land/std@0.197.0/log/mod.ts";
 import { delay } from "https://deno.land/std@0.197.0/async/delay.ts";
 import {
+  LeakingAsyncOpsError,
   MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
@@ -368,6 +369,32 @@ describe("testStream", () => {
           "`testStream` does not allow concurrent call",
         );
       });
+    });
+    it("should rejects if calling helper function without `await`", async () => {
+      await assertRejects(
+        () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ assertReadable, readable }) => {
+            const actual = readable("a-|");
+            assertReadable(actual, "a-|");
+          });
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
+    });
+    it("should rejects if calling helper function that rejects without `await`", async () => {
+      await assertRejects(
+        () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ assertReadable, readable }) => {
+            const actual = readable("a-|");
+            assertReadable(actual, "x-|");
+          });
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
     });
   });
   describe("TestStreamHelper", () => {
