@@ -345,8 +345,7 @@ describe("testStream", () => {
       }
     });
     it("should throws if called within `testStream`", async () => {
-      // deno-lint-ignore require-await
-      await testStream(async () => {
+      await testStream(() => {
         assertThrows(
           () => {
             testStream(async () => {});
@@ -359,15 +358,13 @@ describe("testStream", () => {
     for (
       const [name, fn] of [
         ["assertReadable", () => {
-          // deno-lint-ignore require-await
-          return testStream(async ({ assertReadable, readable }) => {
+          return testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "a-|");
           });
         }],
         ["run", () => {
-          // deno-lint-ignore require-await
-          return testStream(async ({ run, readable }) => {
+          return testStream(({ run, readable }) => {
             const actual = readable("a-|");
             run([actual]);
           });
@@ -385,15 +382,13 @@ describe("testStream", () => {
     for (
       const [name, fn] of [
         ["assertReadable", () => {
-          // deno-lint-ignore require-await
-          return testStream(async ({ assertReadable, readable }) => {
+          return testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "x-|");
           });
         }],
         ["run", () => {
-          // deno-lint-ignore require-await
-          return testStream(async ({ run, readable }) => {
+          return testStream(({ run, readable }) => {
             const actual = readable("a-|");
             run([actual], () => {
               throw new MyCustomError();
@@ -432,8 +427,7 @@ describe("testStream", () => {
         let savedAssertReadable: TestStreamHelperAssertReadable;
         const stream = ReadableStream.from(["a", "b", "c"]);
 
-        // deno-lint-ignore require-await
-        await testStream(async ({ assertReadable }) => {
+        await testStream(({ assertReadable }) => {
           savedAssertReadable = assertReadable;
         });
 
@@ -864,8 +858,7 @@ describe("testStream", () => {
       it("should throws if called outside `testStream`", async () => {
         let savedReadable: TestStreamHelperReadable;
 
-        // deno-lint-ignore require-await
-        await testStream(async ({ readable }) => {
+        await testStream(({ readable }) => {
           savedReadable = readable;
         });
 
@@ -904,8 +897,7 @@ describe("testStream", () => {
           ]
         ) {
           it(`should throws if empty parentheses: ${toPrint(series)}`, async () => {
-            // deno-lint-ignore require-await
-            await testStream(async ({ readable }) => {
+            await testStream(({ readable }) => {
               assertThrows(
                 () => {
                   readable(series);
@@ -925,8 +917,7 @@ describe("testStream", () => {
           ]
         ) {
           it(`should throws if parentheses unmatched: ${toPrint(series)}`, async () => {
-            // deno-lint-ignore require-await
-            await testStream(async ({ readable }) => {
+            await testStream(({ readable }) => {
               assertThrows(
                 () => {
                   readable(series);
@@ -948,8 +939,7 @@ describe("testStream", () => {
           ]
         ) {
           it(`should throws if non-trailing close or error: ${toPrint(series)}`, async () => {
-            // deno-lint-ignore require-await
-            await testStream(async ({ readable }) => {
+            await testStream(({ readable }) => {
               assertThrows(
                 () => {
                   readable(series);
@@ -1206,8 +1196,7 @@ describe("testStream", () => {
       it("should throws if called outside `testStream`", async () => {
         let savedRun: TestStreamHelperRun;
 
-        // deno-lint-ignore require-await
-        await testStream(async ({ run }) => {
+        await testStream(({ run }) => {
           savedRun = run;
         });
 
