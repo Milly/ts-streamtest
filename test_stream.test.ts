@@ -603,7 +603,7 @@ describe("testStream", () => {
         });
       });
       describe("(..., expectedError)", () => {
-        it("should matchs any value if not specified", async () => {
+        it("should matchs any error value if not specified", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               start(controller) {
@@ -614,16 +614,16 @@ describe("testStream", () => {
             await assertReadable(stream, "#");
           });
         });
-        for (const error of ABORT_REASON_CASES) {
-          it(`should matches ${toPrint(error)}`, async () => {
+        for (const reason of ABORT_REASON_CASES) {
+          it(`should matches ${toPrint(reason)} for error`, async () => {
             await testStream(async ({ assertReadable }) => {
               const stream = new ReadableStream({
                 start(controller) {
-                  controller.error(error);
+                  controller.error(reason);
                 },
               });
 
-              await assertReadable(stream, "#", undefined, error);
+              await assertReadable(stream, "#", undefined, reason);
             });
           });
         }
@@ -1116,7 +1116,7 @@ describe("testStream", () => {
         });
       });
       describe("(..., error)", () => {
-        it("should be undefined if not specified", async () => {
+        it("should be undefined for error reason if not specified", async () => {
           await testStream(async ({ readable, run }) => {
             const stream = readable("a-bc#");
 
@@ -1130,10 +1130,10 @@ describe("testStream", () => {
             assertStrictEquals(actual, undefined);
           });
         });
-        for (const error of ABORT_REASON_CASES) {
-          it(`should be possible to specify ${toPrint(error)}`, async () => {
+        for (const reason of ABORT_REASON_CASES) {
+          it(`should be possible to specify ${toPrint(reason)} for error`, async () => {
             await testStream(async ({ readable, run }) => {
-              const stream = readable("a-bc#", undefined, error);
+              const stream = readable("a-bc#", undefined, reason);
 
               assertInstanceOf(stream, ReadableStream);
 
@@ -1142,7 +1142,7 @@ describe("testStream", () => {
               await run([]);
 
               const actual = await assertRejects(() => p);
-              assertStrictEquals(actual, error);
+              assertStrictEquals(actual, reason);
             });
           });
         }
