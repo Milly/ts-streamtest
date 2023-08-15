@@ -398,7 +398,6 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     actual: ReadableStream,
     ...streamArgs: CreateStreamArgs
   ): Promise<void> => {
-    logger().debug("assertReadable(): call", { testStreamId, streamArgs });
     const expected = createStream(...streamArgs);
 
     await processStreams([actual, expected]);
@@ -416,6 +415,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   ): T => {
     const obj = {
       [name](...args: Parameters<T>) {
+        logger().debug(`${name}(): call`, { testStreamId, args });
         return lock(() => fn(...args));
       },
     };
