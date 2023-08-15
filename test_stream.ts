@@ -668,11 +668,8 @@ function createRunnerFromStream<T>(
     streamId,
   });
 
-  const abortController = new AbortController();
-  const { signal } = abortController;
   const log: Frame[] = [];
   let done = false;
-  let closed = false;
   let tickCount = 0;
 
   const addLog = (frame: Frame) => {
@@ -684,32 +681,39 @@ function createRunnerFromStream<T>(
     });
   };
 
+  const reader = source.getReader();
   const readable = new ReadableStream<T>({
     start(controller) {
-      source.pipeTo(
-        new WritableStream<T>({
-          write(chunk) {
-            addLog({ type: "enqueue", value: chunk });
-            controller.enqueue(chunk);
-          },
-          close() {
-            closed = true;
-            done = true;
-            addLog({ type: "close" });
-            controller.close();
-          },
-        }),
-        { signal },
-      ).catch((e) => {
-        if (!closed && !(e instanceof MaxTicksExceededError)) {
+      (async () => {
+        while (true) {
+          const res = await reader.read();
+          if (res.done) {
+            if (!done) {
+              done = true;
+              addLog({ type: "close" });
+              controller.close();
+            }
+            break;
+          } else {
+            addLog({ type: "enqueue", value: res.value });
+            controller.enqueue(res.value);
+          }
+        }
+      })().catch((e) => {
+        if (!done) {
           done = true;
           addLog({ type: "error", value: e });
           controller.error(e);
         }
+      }).finally(() => {
+        reader.releaseLock();
+        logger().debug("reader.releaseLock");
       });
     },
     cancel(reason) {
-      abortController.abort(reason);
+      done = true;
+      addLog({ type: "error", value: reason });
+      return reader.cancel(reason);
     },
   });
 
@@ -723,10 +727,10 @@ function createRunnerFromStream<T>(
         testStreamId: currentTestStreamId,
         streamId,
       });
-      abortController.abort(
+      done = true;
+      reader.cancel(
         new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
       );
-      done = true;
     }
     return !done;
   };
