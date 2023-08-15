@@ -94,8 +94,9 @@ describe("testStream", () => {
     describe("(options)", () => {
       it("should call `options.fn`", async () => {
         const fn = spy(async () => {});
+        const options = { fn };
 
-        await testStream({ fn });
+        await testStream(options);
 
         assertSpyCalls(fn, 1);
       });
@@ -119,12 +120,13 @@ describe("testStream", () => {
       });
       it("should not call `options.fn`", async () => {
         const fn = spy(async () => {});
-        const shouldNotCall = spy(async () => {});
+        const shouldNotCallFn = spy(async () => {});
+        const options = { fn: shouldNotCallFn };
 
         // deno-lint-ignore no-explicit-any
-        await testStream({ fn: shouldNotCall } as any, fn);
+        await testStream(options as any, fn);
 
-        assertSpyCalls(shouldNotCall, 0);
+        assertSpyCalls(shouldNotCallFn, 0);
         assertSpyCalls(fn, 1);
       });
     });
