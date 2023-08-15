@@ -585,7 +585,7 @@ function createRunnerFromFrames(
   const { readable, controller, cancelSignal } = createControllReadable();
   const log: Frame[] = [];
   let done = false;
-  let frameIndex = 0;
+  let frameIndex = -1;
   let tickCount = 0;
 
   const addLog = (frame: Frame) => {
@@ -597,66 +597,58 @@ function createRunnerFromFrames(
     });
   };
 
+  cancelSignal.addEventListener("abort", () => {
+    if (!done) {
+      done = true;
+      addLog({ type: "error", value: cancelSignal.reason });
+    }
+  });
+
   const tick = (): void => {
     if (done) return;
-    if (cancelSignal.aborted) {
-      addLog({ type: "error", value: cancelSignal.reason });
-      done = true;
-      return;
-    }
-    while (frames[frameIndex]?.type === "enqueue") {
-      const { type, value } = frames[frameIndex++];
-      addLog({ type, value });
-      controller.enqueue(value);
-    }
-    if (frameIndex >= frames.length) {
-      done = true;
-      return;
-    } else {
-      const { type, value } = frames[frameIndex++];
+    while (++frameIndex < frames.length) {
+      const { type, value } = frames[frameIndex];
       switch (type) {
-        case "tick": {
-          addLog({ type });
-          if (++tickCount >= maxTicks) {
-            logger().debug("createRunnerFromFrames(): exceeded", {
-              testStreamId: currentTestStreamId,
-              streamId,
-            });
-            controller.error(
-              new MaxTicksExceededError("Ticks exceeded", {
-                cause: { maxTicks },
-              }),
-            );
-            done = true;
-          }
+        case "enqueue": {
+          addLog({ type, value });
+          controller.enqueue(value);
           break;
         }
         case "close": {
           addLog({ type });
           controller.close();
-          done = true;
           break;
         }
         case "error": {
           addLog({ type, value });
           controller.error(value);
-          done = true;
           break;
         }
+        case "tick": {
+          return;
+        }
       }
-      return;
     }
+    done = true;
   };
 
   const postTick = (): boolean => {
     if (done) return false;
-    if (cancelSignal.aborted) {
-      if (log.at(-1)?.type === "tick") {
-        log.pop();
+    const { type } = frames[frameIndex];
+    if (type === "tick") {
+      addLog({ type });
+      if (++tickCount >= maxTicks) {
+        logger().debug("createRunnerFromFrames(): exceeded", {
+          testStreamId: currentTestStreamId,
+          streamId,
+        });
+        done = true;
+        controller.error(
+          new MaxTicksExceededError("Ticks exceeded", {
+            cause: { maxTicks },
+          }),
+        );
       }
-      addLog({ type: "error", value: cancelSignal.reason });
-      done = true;
-      return false;
     }
     return !done;
   };
