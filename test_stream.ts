@@ -132,6 +132,7 @@ export interface TestStreamHelperReadable {
    * - `\x20`  : Space is ignored. Used to align columns.
    * - `-`     : Advance 1 tick.
    * - `|`     : Close the stream.
+   * - `!`     : Cancel the stream.
    * - `#`     : Abort the stream.
    * - `(...)` : Groups characters. It does not advance ticks inside.
    *             After closing `)`, advance 1 tick.
@@ -207,7 +208,7 @@ type Frame = {
   value?: unknown;
 };
 
-type FrameType = "tick" | "enqueue" | "close" | "error";
+type FrameType = "tick" | "enqueue" | "close" | "cancel" | "error";
 
 // deno-lint-ignore no-explicit-any
 type Runner<T = any> = {
@@ -507,8 +508,8 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
   if (!/^(?:[^()]+|\([^()]+\))*$/.test(series)) {
     throw new SyntaxError(`Unmatched group parentheses: "${series}"`);
   }
-  if (series && !/^[^#|]*. *\)? *$/.test(series)) {
-    throw new SyntaxError(`Non-trailing close or error: "${series}"`);
+  if (series && !/^[^|!#]*. *\)? *$/.test(series)) {
+    throw new SyntaxError(`Non-trailing close: "${series}"`);
   }
 
   const frames: Frame[] = [];
@@ -528,6 +529,10 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
       }
       case "|": {
         frames.push({ type: "close" });
+        break loop;
+      }
+      case "!": {
+        frames.push({ type: "cancel", value: error });
         break loop;
       }
       case "#": {
@@ -600,7 +605,7 @@ function createRunnerFromFrames(
   cancelSignal.addEventListener("abort", () => {
     if (!done) {
       done = true;
-      addLog({ type: "error", value: cancelSignal.reason });
+      addLog({ type: "cancel", value: cancelSignal.reason });
     }
   });
 
@@ -616,6 +621,11 @@ function createRunnerFromFrames(
         }
         case "close": {
           addLog({ type });
+          controller.close();
+          break;
+        }
+        case "cancel": {
+          addLog({ type, value });
           controller.close();
           break;
         }
@@ -712,7 +722,7 @@ function createRunnerFromStream<T>(
     },
     cancel(reason) {
       done = true;
-      addLog({ type: "error", value: reason });
+      addLog({ type: "cancel", value: reason });
       return reader.cancel(reason);
     },
   });
@@ -748,19 +758,17 @@ function assertFramesEquals(
   const actualLast = actual.at(-1);
   const expectedLast = expected.at(-1);
   if (
-    actualLast?.type === "error" &&
-    expectedLast?.type === "error" && expectedLast.value === ANY_VALUE
+    actualLast && expectedLast &&
+    (actualLast.type === "cancel" || actualLast.type === "error") &&
+    actualLast.type === expectedLast.type && expectedLast.value === ANY_VALUE
   ) {
-    expected = [
-      ...expected.slice(0, -1),
-      { type: "error", value: actualLast.value },
-    ];
+    expected = [...expected.slice(0, -1), { ...actualLast }];
   }
 
   // Make diffs easier to read.
   const [actualFrames, expectedFrames] = [actual, expected].map((frames) =>
     frames.map(({ type, value }) =>
-      (type === "enqueue" || type === "error") ? { [type]: value } : type
+      (type === "tick" || type === "close") ? type : { [type]: value }
     )
   );
 

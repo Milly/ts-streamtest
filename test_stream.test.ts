@@ -515,6 +515,17 @@ describe("testStream", () => {
             },
           });
         });
+        it("should matchs `!` to cancel the stream", async () => {
+          await testStream(async ({ assertReadable, run }) => {
+            const stream = new ReadableStream();
+
+            await run([stream], (stream) => {
+              stream.cancel();
+            });
+
+            await assertReadable(stream, "!");
+          });
+        });
         it("should matchs `#` to abort the stream", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
@@ -603,6 +614,17 @@ describe("testStream", () => {
         });
       });
       describe("(..., expectedError)", () => {
+        it("should matchs any cancel value if not specified", async () => {
+          await testStream(async ({ assertReadable, run }) => {
+            const stream = new ReadableStream();
+
+            await run([stream], (stream) => {
+              stream.cancel(new MyCustomError());
+            });
+
+            await assertReadable(stream, "!");
+          });
+        });
         it("should matchs any error value if not specified", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
@@ -615,6 +637,17 @@ describe("testStream", () => {
           });
         });
         for (const reason of ABORT_REASON_CASES) {
+          it(`should matches ${toPrint(reason)} for cancel`, async () => {
+            await testStream(async ({ assertReadable, run }) => {
+              const stream = new ReadableStream();
+
+              await run([stream], (stream) => {
+                stream.cancel(reason);
+              });
+
+              await assertReadable(stream, "!", undefined, reason);
+            });
+          });
           it(`should matches ${toPrint(reason)} for error`, async () => {
             await testStream(async ({ assertReadable }) => {
               const stream = new ReadableStream({
@@ -684,7 +717,7 @@ describe("testStream", () => {
             ).catch(() => {});
           });
 
-          await assertReadable(stream, "ab(c#)", undefined, "terminate");
+          await assertReadable(stream, "ab(c!)", undefined, "terminate");
         });
       });
       it("should match the stream asynchronously aborted with `run`", async () => {
@@ -703,7 +736,7 @@ describe("testStream", () => {
             ).catch(() => {});
           });
 
-          await assertReadable(stream, "abc#", undefined, "terminate");
+          await assertReadable(stream, "abc!", undefined, "terminate");
         });
       });
       it("should match the stream transformed from `readable` and processed with `run`", async () => {
@@ -756,7 +789,7 @@ describe("testStream", () => {
             ).catch(() => {});
           });
 
-          await assertReadable(transformed, "AB(C#)", {
+          await assertReadable(transformed, "AB(C!)", {
             A: "aX",
             B: "bX",
             C: "cX",
@@ -787,7 +820,7 @@ describe("testStream", () => {
             ).catch(() => {});
           });
 
-          await assertReadable(transformed, "ABC#", {
+          await assertReadable(transformed, "ABC!", {
             A: "aX",
             B: "bX",
             C: "cX",
@@ -932,21 +965,48 @@ describe("testStream", () => {
           const series of [
             "ab|c",
             "a(|b)",
+            "ab!c",
+            "a(!b)",
             "ab#c",
             "a(#b)",
             "abc|#",
+            "abc|!",
+            "abc!|",
+            "abc!#",
             "abc#|",
+            "abc#!",
           ]
         ) {
-          it(`should throws if non-trailing close or error: ${toPrint(series)}`, async () => {
+          it(`should throws if non-trailing close: ${toPrint(series)}`, async () => {
             await testStream(({ readable }) => {
               assertThrows(
                 () => {
                   readable(series);
                 },
                 SyntaxError,
-                "Non-trailing close or error",
+                "Non-trailing close",
               );
+            });
+          });
+        }
+        for (
+          const series of [
+            "|",
+            "abc|",
+            "a(b|)",
+            "!",
+            "abc!",
+            "a(b!)",
+            "#",
+            "abc#",
+            "a(b#)",
+          ]
+        ) {
+          it(`should not throws if trailing close: ${toPrint(series)}`, async () => {
+            await testStream(({ readable }) => {
+              const stream = readable(series);
+
+              assertInstanceOf(stream, ReadableStream);
             });
           });
         }
@@ -1116,6 +1176,15 @@ describe("testStream", () => {
         });
       });
       describe("(..., error)", () => {
+        it("should be undefined for cancel reason if not specified", async () => {
+          await testStream(async ({ readable, assertReadable }) => {
+            const stream = readable("a-bc!");
+
+            assertInstanceOf(stream, ReadableStream);
+
+            await assertReadable(stream, "a-bc!", undefined, undefined);
+          });
+        });
         it("should be undefined for error reason if not specified", async () => {
           await testStream(async ({ readable, run }) => {
             const stream = readable("a-bc#");
@@ -1131,6 +1200,15 @@ describe("testStream", () => {
           });
         });
         for (const reason of ABORT_REASON_CASES) {
+          it(`should be possible to specify ${toPrint(reason)} for cancel`, async () => {
+            await testStream(async ({ readable, assertReadable }) => {
+              const stream = readable("a-bc!", undefined, reason);
+
+              assertInstanceOf(stream, ReadableStream);
+
+              await assertReadable(stream, "a-bc!", undefined, reason);
+            });
+          });
           it(`should be possible to specify ${toPrint(reason)} for error`, async () => {
             await testStream(async ({ readable, run }) => {
               const stream = readable("a-bc#", undefined, reason);
