@@ -10,6 +10,7 @@ import { AssertionError } from "https://deno.land/std@0.197.0/assert/assertion_e
 import { FakeTime } from "https://deno.land/std@0.197.0/testing/time.ts";
 import { getLogger } from "https://deno.land/std@0.197.0/log/mod.ts";
 import {
+  LeakingAsyncOpsError,
   MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
@@ -22,6 +23,7 @@ const DEFAULT_TICK_TIME = 100;
 const DEFAULT_MAX_TICKS = 50;
 
 const ANY_VALUE = Object.freeze(new (class AnyValue {})());
+const NOOP = () => {};
 
 /** Flag to prevent concurrent calls. */
 let testStreamLocked = false;
@@ -264,7 +266,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   const readableRunnerMap = new Map<ReadableStream, Runner>();
   let disposed = false;
-  let locked = false;
+  /** `undefined` if unlocked, otherwise `Promise` that resolves on unlocked. */
+  let lockPromise: Promise<unknown> | undefined;
 
   const lock = <T>(fn: () => T): T => {
     if (disposed) {
@@ -272,22 +275,23 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
         "Helpers does not allow call outside `testStream`",
       );
     }
-    if (locked) {
+    if (lockPromise) {
       throw new OperationNotPermittedError(
         "Helpers does not allow concurrent call",
       );
     }
-    locked = true;
+    lockPromise = Promise.resolve();
     try {
-      const p = fn();
-      if (p instanceof Promise) {
-        return p.finally(() => locked = false) as T;
+      let result = fn();
+      if (result instanceof Promise) {
+        result = result.finally(() => lockPromise = undefined) as T;
+        lockPromise = result as Promise<unknown>;
       } else {
-        locked = false;
-        return p;
+        lockPromise = undefined;
       }
+      return result;
     } catch (e: unknown) {
-      locked = false;
+      lockPromise = undefined;
       throw e;
     }
   };
@@ -424,20 +428,27 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     run: helperMethod(processStreams, "run"),
   };
 
-  const execute = async () => {
-    try {
-      await fn(helper);
-    } finally {
-      disposed = true;
-      logger().debug("testStream(): end", { testStreamId });
+  const executeFn = async () => {
+    await fn(helper);
+    if (lockPromise) {
+      await Promise.all([lockPromise.catch(NOOP), time.runAllAsync()]);
+      throw new LeakingAsyncOpsError(
+        "Helper function is still running, but `testStream` execution block ends." +
+          " This is often caused by calling helper functions without using `await`.",
+      );
     }
   };
 
   const time = new FakeTime();
-  return execute()
-    .finally(() => time.runAllAsync())
-    .finally(() => time.restore())
-    .finally(() => testStreamLocked = false);
+  return executeFn()
+    .finally(() => {
+      disposed = true;
+      time.restore();
+    })
+    .finally(() => {
+      testStreamLocked = false;
+      logger().debug("testStream(): end", { testStreamId });
+    });
 }
 
 function testStreamDefinition(
