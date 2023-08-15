@@ -328,7 +328,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       }
       await time.runMicrotasks();
 
-      // Abort when the execution block is disposed.
+      // Exit loop when the execution block is disposed.
       if (disposed) break;
 
       logger().debug("processAllTicks(): postTick", { testStreamId });
