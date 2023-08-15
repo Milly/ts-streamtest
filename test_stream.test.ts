@@ -370,32 +370,60 @@ describe("testStream", () => {
         );
       });
     });
-    it("should rejects if calling helper function without `await`", async () => {
-      await assertRejects(
-        () => {
+    for (
+      const [name, fn] of [
+        ["assertReadable", () => {
           // deno-lint-ignore require-await
           return testStream(async ({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "a-|");
           });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-    });
-    it("should rejects if calling helper function that rejects without `await`", async () => {
-      await assertRejects(
-        () => {
+        }],
+        ["run", () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ run, readable }) => {
+            const actual = readable("a-|");
+            run([actual]);
+          });
+        }],
+      ] as const
+    ) {
+      it(`should rejects if calling \`${name}\` without \`await\``, async () => {
+        await assertRejects(
+          fn,
+          LeakingAsyncOpsError,
+          "Helper function is still running",
+        );
+      });
+    }
+    for (
+      const [name, fn] of [
+        ["assertReadable", () => {
           // deno-lint-ignore require-await
           return testStream(async ({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "x-|");
           });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-    });
+        }],
+        ["run", () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ run, readable }) => {
+            const actual = readable("a-|");
+            run([actual], () => {
+              throw new MyCustomError();
+            });
+          });
+        }],
+      ] as const
+    ) {
+      it(`should rejects if calling \`${name}\` that rejects without \`await\``, async () => {
+        await assertRejects(
+          fn,
+          LeakingAsyncOpsError,
+          "Helper function is still running",
+        );
+      });
+    }
   });
   describe("TestStreamHelper", () => {
     describe(".assertReadable", () => {
