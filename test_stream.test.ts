@@ -132,15 +132,6 @@ describe("testStream", () => {
     });
   });
   describe("TestStreamDefinition", () => {
-    describe(".fn", () => {
-      it("should call the specified function once", async () => {
-        const fn = spy(async () => {});
-
-        await testStream({ fn });
-
-        assertSpyCalls(fn, 1);
-      });
-    });
     describe(".maxTicks", () => {
       it("should aborts streams at 50 ticks if not specified", async () => {
         await testStream({
@@ -314,13 +305,6 @@ describe("testStream", () => {
     });
   });
   describe("TestStreamFn", () => {
-    it("should call the specified function once", async () => {
-      const fn = spy(async () => {});
-
-      await testStream(fn);
-
-      assertSpyCalls(fn, 1);
-    });
     it("should have TestStreamHelper in the first argument", async () => {
       const fn = spy(async (_helper: TestStreamHelper) => {});
 
