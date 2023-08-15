@@ -55,7 +55,7 @@ jobs:
       - name: Test
         run: deno task testcov
       - name: Coverage
-        run: deno task coverage
+        run: deno task coverage --lcov --output=./lcov
       - uses: codecov/codecov-action@v3
         with:
-          files: ./coverage.lcov
+          files: ./lcov

@@ -94,8 +94,9 @@ describe("testStream", () => {
     describe("(options)", () => {
       it("should call `options.fn`", async () => {
         const fn = spy(async () => {});
+        const options = { fn };
 
-        await testStream({ fn });
+        await testStream(options);
 
         assertSpyCalls(fn, 1);
       });
@@ -119,26 +120,18 @@ describe("testStream", () => {
       });
       it("should not call `options.fn`", async () => {
         const fn = spy(async () => {});
-        const shouldNotCall = spy(async () => {});
+        const shouldNotCallFn = spy(async () => {});
+        const options = { fn: shouldNotCallFn };
 
         // deno-lint-ignore no-explicit-any
-        await testStream({ fn: shouldNotCall } as any, fn);
+        await testStream(options as any, fn);
 
-        assertSpyCalls(shouldNotCall, 0);
+        assertSpyCalls(shouldNotCallFn, 0);
         assertSpyCalls(fn, 1);
       });
     });
   });
   describe("TestStreamDefinition", () => {
-    describe(".fn", () => {
-      it("should call the specified function once", async () => {
-        const fn = spy(async () => {});
-
-        await testStream({ fn });
-
-        assertSpyCalls(fn, 1);
-      });
-    });
     describe(".maxTicks", () => {
       it("should aborts streams at 50 ticks if not specified", async () => {
         await testStream({
@@ -312,13 +305,6 @@ describe("testStream", () => {
     });
   });
   describe("TestStreamFn", () => {
-    it("should call the specified function once", async () => {
-      const fn = spy(async () => {});
-
-      await testStream(fn);
-
-      assertSpyCalls(fn, 1);
-    });
     it("should have TestStreamHelper in the first argument", async () => {
       const fn = spy(async (_helper: TestStreamHelper) => {});
 
@@ -370,32 +356,60 @@ describe("testStream", () => {
         );
       });
     });
-    it("should rejects if calling helper function without `await`", async () => {
-      await assertRejects(
-        () => {
+    for (
+      const [name, fn] of [
+        ["assertReadable", () => {
           // deno-lint-ignore require-await
           return testStream(async ({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "a-|");
           });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-    });
-    it("should rejects if calling helper function that rejects without `await`", async () => {
-      await assertRejects(
-        () => {
+        }],
+        ["run", () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ run, readable }) => {
+            const actual = readable("a-|");
+            run([actual]);
+          });
+        }],
+      ] as const
+    ) {
+      it(`should rejects if calling \`${name}\` without \`await\``, async () => {
+        await assertRejects(
+          fn,
+          LeakingAsyncOpsError,
+          "Helper function is still running",
+        );
+      });
+    }
+    for (
+      const [name, fn] of [
+        ["assertReadable", () => {
           // deno-lint-ignore require-await
           return testStream(async ({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "x-|");
           });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-    });
+        }],
+        ["run", () => {
+          // deno-lint-ignore require-await
+          return testStream(async ({ run, readable }) => {
+            const actual = readable("a-|");
+            run([actual], () => {
+              throw new MyCustomError();
+            });
+          });
+        }],
+      ] as const
+    ) {
+      it(`should rejects if calling \`${name}\` that rejects without \`await\``, async () => {
+        await assertRejects(
+          fn,
+          LeakingAsyncOpsError,
+          "Helper function is still running",
+        );
+      });
+    }
   });
   describe("TestStreamHelper", () => {
     describe(".assertReadable", () => {

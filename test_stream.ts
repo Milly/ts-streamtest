@@ -328,7 +328,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       }
       await time.runMicrotasks();
 
-      // Abort when the execution block is disposed.
+      // Exit loop when the execution block is disposed.
       if (disposed) break;
 
       logger().debug("processAllTicks(): postTick", { testStreamId });
@@ -372,7 +372,6 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     if (fn) {
       let fnContinue = true;
       const fnRunner = async () => {
-        await time.runMicrotasks();
         logger().debug("processStreams(): fn: start", { testStreamId });
         await fn(...wrappedStreams);
         logger().debug("processStreams(): fn: end", { testStreamId });
@@ -380,11 +379,11 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       };
 
       const ticksRunner = async () => {
-        await time.runMicrotasks();
         await processAllTicks();
         while (fnContinue && !disposed && await time.nextAsync());
       };
 
+      await time.runMicrotasks();
       await Promise.all([fnRunner(), ticksRunner()]);
     } else {
       await processAllTicks();
@@ -722,8 +721,7 @@ function createRunnerFromStream<T>(
     },
   });
 
-  const tick = (): void => {
-  };
+  const tick = NOOP;
 
   const postTick = (): boolean => {
     if (done) return false;
