@@ -71,7 +71,7 @@ export interface TestStreamFn {
    * @param helper The test stream helper.
    * @returns A promise that resolves when the execution block is complete.
    */
-  (helper: TestStreamHelper): Promise<void>;
+  (helper: TestStreamHelper): Promise<void> | void;
 }
 
 /** Represents the helper functions provided in the `testStream` block. */
