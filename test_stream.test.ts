@@ -800,6 +800,33 @@ describe("testStream", () => {
           }, "terminate");
         });
       });
+      it("should match the stream that uses timer", async () => {
+        await testStream(async ({ assertReadable }) => {
+          const stream = new ReadableStream<string>({
+            async start(controller) {
+              controller.enqueue("A");
+              await delay(100);
+              controller.close();
+            },
+          });
+
+          await assertReadable(stream, "A|");
+        });
+      });
+      it("should match the stream that uses await before timer", async () => {
+        await testStream(async ({ assertReadable }) => {
+          const stream = new ReadableStream<string>({
+            async start(controller) {
+              await Promise.resolve();
+              controller.enqueue("A");
+              await delay(100);
+              controller.close();
+            },
+          });
+
+          await assertReadable(stream, "A|");
+        });
+      });
     });
     describe(".readable", () => {
       it("should returns a readable stream", async () => {
