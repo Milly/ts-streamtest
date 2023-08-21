@@ -1,4 +1,4 @@
-import { assertExists } from "https://deno.land/std@0.197.0/assert/mod.ts";
+import { assertExists } from "https://deno.land/std@0.199.0/assert/mod.ts";
 
 const FILES = ["README.md"];
 
