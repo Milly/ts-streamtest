@@ -5,10 +5,10 @@
  * @module
  */
 
-import { assertEquals } from "https://deno.land/std@0.197.0/assert/assert_equals.ts";
-import { AssertionError } from "https://deno.land/std@0.197.0/assert/assertion_error.ts";
-import { FakeTime } from "https://deno.land/std@0.197.0/testing/time.ts";
-import { getLogger } from "https://deno.land/std@0.197.0/log/mod.ts";
+import { assertEquals } from "https://deno.land/std@0.199.0/assert/assert_equals.ts";
+import { AssertionError } from "https://deno.land/std@0.199.0/assert/assertion_error.ts";
+import { FakeTime } from "https://deno.land/std@0.199.0/testing/time.ts";
+import { getLogger } from "https://deno.land/std@0.199.0/log/mod.ts";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
