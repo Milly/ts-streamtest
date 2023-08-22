@@ -132,6 +132,7 @@ export interface TestStreamHelperReadable {
    * - `\x20`  : Space is ignored. Used to align columns.
    * - `-`     : Advance 1 tick.
    * - `|`     : Close the stream.
+   * - `!`     : Cancel the stream.
    * - `#`     : Abort the stream.
    * - `(...)` : Groups characters. It does not advance ticks inside.
    *             After closing `)`, advance 1 tick.
@@ -207,7 +208,7 @@ type Frame = {
   value?: unknown;
 };
 
-type FrameType = "tick" | "enqueue" | "close" | "error";
+type FrameType = "tick" | "enqueue" | "close" | "cancel" | "error";
 
 // deno-lint-ignore no-explicit-any
 type Runner<T = any> = {
@@ -507,8 +508,8 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
   if (!/^(?:[^()]+|\([^()]+\))*$/.test(series)) {
     throw new SyntaxError(`Unmatched group parentheses: "${series}"`);
   }
-  if (series && !/^[^#|]*. *\)? *$/.test(series)) {
-    throw new SyntaxError(`Non-trailing close or error: "${series}"`);
+  if (series && !/^[^|!#]*. *\)? *$/.test(series)) {
+    throw new SyntaxError(`Non-trailing close: "${series}"`);
   }
 
   const frames: Frame[] = [];
@@ -528,6 +529,10 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
       }
       case "|": {
         frames.push({ type: "close" });
+        break loop;
+      }
+      case "!": {
+        frames.push({ type: "cancel", value: error });
         break loop;
       }
       case "#": {
@@ -585,7 +590,7 @@ function createRunnerFromFrames(
   const { readable, controller, cancelSignal } = createControllReadable();
   const log: Frame[] = [];
   let done = false;
-  let frameIndex = 0;
+  let frameIndex = -1;
   let tickCount = 0;
 
   const addLog = (frame: Frame) => {
@@ -597,66 +602,63 @@ function createRunnerFromFrames(
     });
   };
 
+  cancelSignal.addEventListener("abort", () => {
+    if (!done) {
+      done = true;
+      addLog({ type: "cancel", value: cancelSignal.reason });
+    }
+  });
+
   const tick = (): void => {
     if (done) return;
-    if (cancelSignal.aborted) {
-      addLog({ type: "error", value: cancelSignal.reason });
-      done = true;
-      return;
-    }
-    while (frames[frameIndex]?.type === "enqueue") {
-      const { type, value } = frames[frameIndex++];
-      addLog({ type, value });
-      controller.enqueue(value);
-    }
-    if (frameIndex >= frames.length) {
-      done = true;
-      return;
-    } else {
-      const { type, value } = frames[frameIndex++];
+    while (++frameIndex < frames.length) {
+      const { type, value } = frames[frameIndex];
       switch (type) {
-        case "tick": {
-          addLog({ type });
-          if (++tickCount >= maxTicks) {
-            logger().debug("createRunnerFromFrames(): exceeded", {
-              testStreamId: currentTestStreamId,
-              streamId,
-            });
-            controller.error(
-              new MaxTicksExceededError("Ticks exceeded", {
-                cause: { maxTicks },
-              }),
-            );
-            done = true;
-          }
+        case "enqueue": {
+          addLog({ type, value });
+          controller.enqueue(value);
           break;
         }
         case "close": {
           addLog({ type });
           controller.close();
-          done = true;
+          break;
+        }
+        case "cancel": {
+          addLog({ type, value });
+          controller.close();
           break;
         }
         case "error": {
           addLog({ type, value });
           controller.error(value);
-          done = true;
           break;
         }
+        case "tick": {
+          return;
+        }
       }
-      return;
     }
+    done = true;
   };
 
   const postTick = (): boolean => {
     if (done) return false;
-    if (cancelSignal.aborted) {
-      if (log.at(-1)?.type === "tick") {
-        log.pop();
+    const { type } = frames[frameIndex];
+    if (type === "tick") {
+      addLog({ type });
+      if (++tickCount >= maxTicks) {
+        logger().debug("createRunnerFromFrames(): exceeded", {
+          testStreamId: currentTestStreamId,
+          streamId,
+        });
+        done = true;
+        controller.error(
+          new MaxTicksExceededError("Ticks exceeded", {
+            cause: { maxTicks },
+          }),
+        );
       }
-      addLog({ type: "error", value: cancelSignal.reason });
-      done = true;
-      return false;
     }
     return !done;
   };
@@ -676,11 +678,8 @@ function createRunnerFromStream<T>(
     streamId,
   });
 
-  const abortController = new AbortController();
-  const { signal } = abortController;
   const log: Frame[] = [];
   let done = false;
-  let closed = false;
   let tickCount = 0;
 
   const addLog = (frame: Frame) => {
@@ -692,32 +691,39 @@ function createRunnerFromStream<T>(
     });
   };
 
+  const reader = source.getReader();
   const readable = new ReadableStream<T>({
     start(controller) {
-      source.pipeTo(
-        new WritableStream<T>({
-          write(chunk) {
-            addLog({ type: "enqueue", value: chunk });
-            controller.enqueue(chunk);
-          },
-          close() {
-            closed = true;
-            done = true;
-            addLog({ type: "close" });
-            controller.close();
-          },
-        }),
-        { signal },
-      ).catch((e) => {
-        if (!closed && !(e instanceof MaxTicksExceededError)) {
+      (async () => {
+        while (true) {
+          const res = await reader.read();
+          if (res.done) {
+            if (!done) {
+              done = true;
+              addLog({ type: "close" });
+              controller.close();
+            }
+            break;
+          } else {
+            addLog({ type: "enqueue", value: res.value });
+            controller.enqueue(res.value);
+          }
+        }
+      })().catch((e) => {
+        if (!done) {
           done = true;
           addLog({ type: "error", value: e });
           controller.error(e);
         }
+      }).finally(() => {
+        reader.releaseLock();
+        logger().debug("reader.releaseLock");
       });
     },
     cancel(reason) {
-      abortController.abort(reason);
+      done = true;
+      addLog({ type: "cancel", value: reason });
+      return reader.cancel(reason);
     },
   });
 
@@ -731,10 +737,10 @@ function createRunnerFromStream<T>(
         testStreamId: currentTestStreamId,
         streamId,
       });
-      abortController.abort(
+      done = true;
+      reader.cancel(
         new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
       );
-      done = true;
     }
     return !done;
   };
@@ -752,19 +758,17 @@ function assertFramesEquals(
   const actualLast = actual.at(-1);
   const expectedLast = expected.at(-1);
   if (
-    actualLast?.type === "error" &&
-    expectedLast?.type === "error" && expectedLast.value === ANY_VALUE
+    actualLast && expectedLast &&
+    (actualLast.type === "cancel" || actualLast.type === "error") &&
+    actualLast.type === expectedLast.type && expectedLast.value === ANY_VALUE
   ) {
-    expected = [
-      ...expected.slice(0, -1),
-      { type: "error", value: actualLast.value },
-    ];
+    expected = [...expected.slice(0, -1), { ...actualLast }];
   }
 
   // Make diffs easier to read.
   const [actualFrames, expectedFrames] = [actual, expected].map((frames) =>
     frames.map(({ type, value }) =>
-      (type === "enqueue" || type === "error") ? { [type]: value } : type
+      (type === "tick" || type === "close") ? type : { [type]: value }
     )
   );
 

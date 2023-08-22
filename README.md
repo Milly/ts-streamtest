@@ -23,6 +23,7 @@ The following characters are available in the `series`:
 - `\x20` : Space is ignored. Used to align columns.
 - `-` : Advance 1 tick.
 - `|` : Close the stream.
+- `!` : Cancel the stream.
 - `#` : Abort the stream.
 - `(...)` : Groups characters. It does not advance ticks inside. After closing
   `)`, advance 1 tick.
