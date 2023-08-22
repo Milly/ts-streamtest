@@ -281,7 +281,7 @@ describe("testStream", () => {
           () => {
             testStream({
               tickTime: -1,
-              async fn({ run }) {
+              fn: async ({ run }) => {
                 await run([]);
               },
             });
