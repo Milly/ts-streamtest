@@ -298,8 +298,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   /** Returns a readable for the specified stream arguments. */
-  const createStream = (...streamArgs: CreateStreamArgs): ReadableStream => {
-    const frames = parseSeries(...streamArgs);
+  const createStream = (frames: Frame[]): ReadableStream => {
     const runner = createRunnerFromFrames(frames, maxTicks);
     readableRunnerMap.set(runner.readable, runner);
     return runner.readable;
@@ -351,8 +350,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       streamId: nextStreamId,
       streamArgs,
     });
-    const [series, values, error] = streamArgs;
-    return createStream(series, values, error);
+    const frames = parseSeries(...streamArgs);
+    return createStream(frames);
   };
 
   /** `run` helper. */
@@ -397,7 +396,14 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     actual: ReadableStream,
     ...streamArgs: CreateStreamArgs
   ): Promise<void> => {
-    const expected = createStream(...streamArgs);
+    const [series, values = {}] = streamArgs;
+
+    // Use ANY_VALUE if the error argument is unspecified.
+    // Otherwise use the value of it. This is to allow undefined.
+    const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
+
+    const expectedFrames = parseSeries(series, values, error);
+    const expected = createStream(expectedFrames);
 
     await processStreams([actual, expected]);
 
@@ -495,11 +501,7 @@ function testStreamDefinition(
 }
 
 function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
-  const [series, values = {}] = streamArgs;
-
-  // Use ANY_VALUE if the 3rd argument is unspecified.
-  // Otherwise use the value of it. This is to allow undefined.
-  const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
+  const [series, values = {}, error = undefined] = streamArgs;
 
   if (series.includes("()")) {
     throw new SyntaxError(`Empty group: "${series}"`);
