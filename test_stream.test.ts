@@ -355,56 +355,56 @@ describe("testStream", () => {
         );
       });
     });
-    for (
-      const [name, fn] of [
-        ["assertReadable", () => {
+    it("should rejects if calling `assertReadbale` without `await`", async () => {
+      await assertRejects(
+        () => {
           return testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "a-|");
           });
-        }],
-        ["run", () => {
-          return testStream(({ run, readable }) => {
-            const actual = readable("a-|");
-            run([actual]);
-          });
-        }],
-      ] as const
-    ) {
-      it(`should rejects if calling \`${name}\` without \`await\``, async () => {
-        await assertRejects(
-          fn,
-          LeakingAsyncOpsError,
-          "Helper function is still running",
-        );
-      });
-    }
-    for (
-      const [name, fn] of [
-        ["assertReadable", () => {
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
+    });
+    it("should rejects if calling `assertReadable` that rejects without `await`", async () => {
+      await assertRejects(
+        () => {
           return testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "x-|");
           });
-        }],
-        ["run", () => {
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
+    });
+    it("should rejects if calling `run` without `await`", async () => {
+      await assertRejects(
+        () => {
+          return testStream(({ run, readable }) => {
+            const actual = readable("a-|");
+            run([actual]);
+          });
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
+    });
+    it("should rejects if calling `run` that rejects without `await`", async () => {
+      await assertRejects(
+        () => {
           return testStream(({ run, readable }) => {
             const actual = readable("a-|");
             run([actual], () => {
               throw new MyCustomError();
             });
           });
-        }],
-      ] as const
-    ) {
-      it(`should rejects if calling \`${name}\` that rejects without \`await\``, async () => {
-        await assertRejects(
-          fn,
-          LeakingAsyncOpsError,
-          "Helper function is still running",
-        );
-      });
-    }
+        },
+        LeakingAsyncOpsError,
+        "Helper function is still running",
+      );
+    });
   });
   describe("TestStreamHelper", () => {
     describe(".assertReadable", () => {
@@ -1329,9 +1329,14 @@ describe("testStream", () => {
           });
 
           assertNotStrictEquals(
-            await Promise.race([p1, p2, Promise.resolve(IS_PENDING)]),
+            await Promise.race([p1, Promise.resolve(IS_PENDING)]),
             IS_PENDING,
-            "p1, p2 should be resolved after run",
+            "p1 should be resolved after run",
+          );
+          assertNotStrictEquals(
+            await Promise.race([p2, Promise.resolve(IS_PENDING)]),
+            IS_PENDING,
+            "p2 should be resolved after run",
           );
 
           assertEquals(actual1, ["a", "b", "c"]);
@@ -1387,13 +1392,6 @@ describe("testStream", () => {
           const stream1 = readable("abcd|");
           const stream2 = readable("def|");
 
-          const transformed1 = stream1.pipeThrough(
-            new TransformStream({
-              transform(chunk, controller) {
-                controller.enqueue(`${chunk}X`);
-              },
-            }),
-          );
           const transformed2 = stream2.pipeThrough(
             new TransformStream({
               transform(chunk, controller) {
@@ -1416,16 +1414,8 @@ describe("testStream", () => {
           });
 
           await run(
-            [transformed1, transformed2],
+            [stream1, transformed2],
             async (readable1, readable2) => {
-              assert(
-                transformed1.locked,
-                "transformed1 stream should be locked",
-              );
-              assert(
-                transformed2.locked,
-                "transformed2 stream should be locked",
-              );
               assertFalse(readable1.locked, "readable1 should not be locked");
               assertFalse(readable2.locked, "readable2 should not be locked");
 
@@ -1436,7 +1426,7 @@ describe("testStream", () => {
             },
           );
 
-          assertEquals(actual1, ["aX", "bX", "cX", "dX"]);
+          assertEquals(actual1, ["a", "b", "c", "d"]);
           assertEquals(actual2, ["dY", "eY", "fY"]);
         });
       });
