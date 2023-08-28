@@ -854,6 +854,20 @@ describe("testStream", () => {
           await assertReadable(stream, "A|");
         });
       });
+      it("should match the stream that uses `delay(0)` first", async () => {
+        await testStream(async ({ assertReadable }) => {
+          const stream = new ReadableStream<string>({
+            async start(controller) {
+              await delay(0);
+              controller.enqueue("A");
+              await delay(100);
+              controller.close();
+            },
+          });
+
+          await assertReadable(stream, "A|");
+        });
+      });
     });
     describe(".readable", () => {
       it("should returns a readable stream", async () => {
@@ -1024,7 +1038,8 @@ describe("testStream", () => {
             );
 
             await run([], async () => {
-              await delay(0);
+              assertEquals(actual, []);
+              await delay(1);
               assertEquals(actual, ["a"]);
               await delay(100);
               assertEquals(actual, ["a", "b"]);
@@ -1049,10 +1064,9 @@ describe("testStream", () => {
             );
 
             await run([], async () => {
-              await delay(0);
-              await delay(400);
+              await delay(500);
               assertEquals(actual, []);
-              await delay(100);
+              await delay(1);
               assertEquals(actual, ["a"]);
               await delay(200);
               assertEquals(actual, ["a"]);

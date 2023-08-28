@@ -327,15 +327,14 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       for (const runner of runners) {
         runner.tick();
       }
+      await time.tickAsync(0);
+      if (disposed) break;
       await time.runMicrotasks();
-
-      // Exit loop when the execution block is disposed.
       if (disposed) break;
 
       logger().debug("processAllTicks(): postTick", { testStreamId });
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
-      await time.runMicrotasks();
 
       if (!results.includes(true)) break;
     }
