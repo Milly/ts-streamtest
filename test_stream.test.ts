@@ -23,6 +23,7 @@ import * as log from "https://deno.land/std@0.199.0/log/mod.ts";
 import { delay } from "https://deno.land/std@0.199.0/async/delay.ts";
 import {
   LeakingAsyncOpsError,
+  MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
 import {
@@ -139,7 +140,7 @@ describe("testStream", () => {
         await testStream({
           async fn({ readable, run, assertReadable }) {
             const ticks49 = Array(49 + 1).join("-");
-            framedStream = readable(`      ${ticks49}ab|`);
+            framedStream = readable(`      ${ticks49}a`);
             const framedStreamExpected = ` ${ticks49}a`;
             const actualStreamExpected = ` ${ticks49}-`;
 
@@ -157,7 +158,9 @@ describe("testStream", () => {
               }),
             });
 
-            await run([framedStream, actualStream]);
+            await run([framedStream, actualStream], async () => {
+              await delay(10000);
+            });
 
             assertEquals(actualChunks, ["a"]);
             await assertReadable(framedStream, framedStreamExpected);
@@ -177,7 +180,7 @@ describe("testStream", () => {
           maxTicks: 30,
           async fn({ readable, run, assertReadable }) {
             const ticks29 = Array(29 + 1).join("-");
-            framedStream = readable(`     ${ticks29}ab|`);
+            framedStream = readable(`     ${ticks29}a`);
             const framedStreamExpected = `${ticks29}a`;
             const actualStreamExpected = `${ticks29}-`;
 
@@ -195,7 +198,9 @@ describe("testStream", () => {
               }),
             });
 
-            await run([framedStream, actualStream]);
+            await run([framedStream, actualStream], async () => {
+              await delay(10000);
+            });
 
             assertEquals(actualChunks, ["a"]);
             await assertReadable(framedStream, framedStreamExpected);
@@ -527,7 +532,7 @@ describe("testStream", () => {
         it("should matchs unclosed stream without `|`", async () => {
           await testStream({
             maxTicks: 5,
-            fn: async ({ assertReadable }) => {
+            async fn({ assertReadable }) {
               const stream = new ReadableStream();
 
               await assertReadable(stream, "-----");
@@ -588,6 +593,22 @@ describe("testStream", () => {
             });
 
             await assertReadable(stream, "a(bc)(d|)");
+          });
+        });
+        it("should throws if ticks longer than `maxTicks`", async () => {
+          await testStream({
+            maxTicks: 5,
+            fn({ assertReadable }) {
+              const stream = new ReadableStream();
+
+              assertThrows(
+                () => {
+                  assertReadable(stream, "------");
+                },
+                MaxTicksExceededError,
+                "Ticks exceeded",
+              );
+            },
           });
         });
       });
@@ -1134,6 +1155,20 @@ describe("testStream", () => {
           });
 
           assertEquals(stream!.locked, false);
+        });
+        it("should throws if ticks longer than `maxTicks`", async () => {
+          await testStream({
+            maxTicks: 5,
+            fn({ readable }) {
+              assertThrows(
+                () => {
+                  readable("------");
+                },
+                MaxTicksExceededError,
+                "Ticks exceeded",
+              );
+            },
+          });
         });
       });
       describe("(..., values, ...)", () => {
