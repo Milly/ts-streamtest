@@ -23,7 +23,6 @@ import * as log from "https://deno.land/std@0.199.0/log/mod.ts";
 import { delay } from "https://deno.land/std@0.199.0/async/delay.ts";
 import {
   LeakingAsyncOpsError,
-  MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
 import {
@@ -133,60 +132,80 @@ describe("testStream", () => {
   });
   describe("TestStreamDefinition", () => {
     describe(".maxTicks", () => {
-      it("should aborts streams at 50 ticks if not specified", async () => {
+      it("should close streams at 50 ticks if not specified", async () => {
+        let framedStream: ReadableStream<string>;
+        let cancelReason: unknown;
+
         await testStream({
-          async fn({ readable, run }) {
-            const ticks = Array(49 + 1).join("-");
-            const stream = readable(ticks + "ab|");
+          async fn({ readable, run, assertReadable }) {
+            const ticks49 = Array(49 + 1).join("-");
+            framedStream = readable(`      ${ticks49}ab|`);
+            const framedStreamExpected = ` ${ticks49}a`;
+            const actualStreamExpected = ` ${ticks49}-`;
 
-            const actual: string[] = [];
-            const writable = new WritableStream<string>({
-              write(chunk) {
-                actual.push(chunk);
-              },
-            });
-
-            await run([stream], async (stream) => {
-              await assertRejects(
-                () => {
-                  return stream.pipeTo(writable);
+            const actualChunks: string[] = [];
+            const actualStream = framedStream.pipeThrough({
+              writable: new WritableStream<string>({
+                write(chunk) {
+                  actualChunks.push(chunk);
                 },
-                MaxTicksExceededError,
-                "Ticks exceeded",
-              );
+              }),
+              readable: new ReadableStream({
+                cancel(reason) {
+                  cancelReason = reason;
+                },
+              }),
             });
 
-            assertEquals(actual, ["a"]);
+            await run([framedStream, actualStream]);
+
+            assertEquals(actualChunks, ["a"]);
+            await assertReadable(framedStream, framedStreamExpected);
+            await assertReadable(actualStream, actualStreamExpected);
+            assertEquals(framedStream.locked, true);
           },
         });
+
+        assertEquals(framedStream!.locked, false);
+        assertEquals(cancelReason, "testStream disposed");
       });
-      it("should aborts streams at the specified number of ticks", async () => {
+      it("should close streams at the specified number of ticks", async () => {
+        let framedStream: ReadableStream<string>;
+        let cancelReason: unknown;
+
         await testStream({
           maxTicks: 30,
-          async fn({ readable, run }) {
-            const ticks = Array(29 + 1).join("-");
-            const stream = readable(ticks + "ab|");
+          async fn({ readable, run, assertReadable }) {
+            const ticks29 = Array(29 + 1).join("-");
+            framedStream = readable(`     ${ticks29}ab|`);
+            const framedStreamExpected = `${ticks29}a`;
+            const actualStreamExpected = `${ticks29}-`;
 
-            const actual: string[] = [];
-            const writable = new WritableStream<string>({
-              write(chunk) {
-                actual.push(chunk);
-              },
-            });
-
-            await run([stream], async (stream) => {
-              await assertRejects(
-                () => {
-                  return stream.pipeTo(writable);
+            const actualChunks: string[] = [];
+            const actualStream = framedStream.pipeThrough({
+              writable: new WritableStream<string>({
+                write(chunk) {
+                  actualChunks.push(chunk);
                 },
-                MaxTicksExceededError,
-                "Ticks exceeded",
-              );
+              }),
+              readable: new ReadableStream({
+                cancel(reason) {
+                  cancelReason = reason;
+                },
+              }),
             });
 
-            assertEquals(actual, ["a"]);
+            await run([framedStream, actualStream]);
+
+            assertEquals(actualChunks, ["a"]);
+            await assertReadable(framedStream, framedStreamExpected);
+            await assertReadable(actualStream, actualStreamExpected);
+            assertEquals(framedStream.locked, true);
           },
         });
+
+        assertEquals(framedStream!.locked, false);
+        assertEquals(cancelReason, "testStream disposed");
       });
       it("should throws if 0 is specified", () => {
         assertThrows(
@@ -1082,34 +1101,39 @@ describe("testStream", () => {
           });
         });
         it("should close the stream with `|`", async () => {
-          await testStream(async ({ readable, run }) => {
-            const stream = readable("|");
+          await testStream(async ({ readable, run, assertReadable }) => {
+            const stream = readable("---|");
+            const expected = "       ---|";
 
             stream.pipeTo(new WritableStream());
 
             await run([], async () => {
-              await delay(0);
-              assertFalse(stream.locked, "Stream should closed");
+              await delay(250);
+              assertEquals(stream.locked, true);
+              await delay(100);
+              assertEquals(stream.locked, false);
             });
+
+            await assertReadable(stream, expected);
           });
         });
         it("should not close the stream without `|`", async () => {
-          await testStream(async ({ readable, run }) => {
-            const abortController = new AbortController();
-            const { signal } = abortController;
-            const stream = readable("");
+          let stream: ReadableStream<string>;
 
-            const p = stream.pipeTo(new WritableStream(), { signal });
-            p.catch(() => {});
+          await testStream({
+            maxTicks: 10,
+            async fn({ readable, assertReadable }) {
+              stream = readable("---");
+              const expected = " ----------";
 
-            await run([], async () => {
-              await delay(3000);
-              assert(stream.locked, "Stream should not closed");
-            });
+              stream.pipeTo(new WritableStream());
 
-            abortController.abort();
-            await p.catch(() => {});
+              await assertReadable(stream, expected);
+              assertEquals(stream.locked, true);
+            },
           });
+
+          assertEquals(stream!.locked, false);
         });
       });
       describe("(..., values, ...)", () => {
@@ -1442,6 +1466,27 @@ describe("testStream", () => {
 
           assertEquals(actual1, ["a", "b", "c", "d"]);
           assertEquals(actual2, ["dY", "eY", "fY"]);
+        });
+      });
+      it("should fulfilled the long delay in `fn`", async () => {
+        await testStream({
+          maxTicks: 50,
+          async fn({ run }) {
+            await run([], async () => {
+              await delay(10000);
+            });
+          },
+        });
+      });
+      it("should fulfilled multiple long delays in `fn`", async () => {
+        await testStream({
+          maxTicks: 50,
+          async fn({ run }) {
+            await run([], async () => {
+              await delay(10000);
+              await delay(10000);
+            });
+          },
         });
       });
     });

@@ -11,7 +11,6 @@ import { FakeTime } from "https://deno.land/std@0.199.0/testing/time.ts";
 import { getLogger } from "https://deno.land/std@0.199.0/log/mod.ts";
 import {
   LeakingAsyncOpsError,
-  MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
 
@@ -233,6 +232,8 @@ type Runner<T = any> = {
    * @returns The processing log.
    */
   correctLog(): readonly Frame[];
+
+  dispose(): void;
 };
 
 type CreateStreamArgs = [
@@ -298,8 +299,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   /** Returns a readable for the specified stream arguments. */
-  const createStream = (...streamArgs: CreateStreamArgs): ReadableStream => {
-    const frames = parseSeries(...streamArgs);
+  const createStream = (frames: Frame[]): ReadableStream => {
     const runner = createRunnerFromFrames(frames, maxTicks);
     readableRunnerMap.set(runner.readable, runner);
     return runner.readable;
@@ -351,8 +351,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       streamId: nextStreamId,
       streamArgs,
     });
-    const [series, values, error] = streamArgs;
-    return createStream(series, values, error);
+    const frames = parseSeries(...streamArgs);
+    return createStream(frames);
   };
 
   /** `run` helper. */
@@ -397,14 +397,20 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     actual: ReadableStream,
     ...streamArgs: CreateStreamArgs
   ): Promise<void> => {
-    const expected = createStream(...streamArgs);
+    const [series, values = {}] = streamArgs;
+
+    // Use ANY_VALUE if the error argument is unspecified.
+    // Otherwise use the value of it. This is to allow undefined.
+    const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
+
+    const expectedFrames = parseSeries(series, values, error);
+    const expected = createStream(expectedFrames);
 
     await processStreams([actual, expected]);
 
-    assertFramesEquals(
-      getRunner(actual).correctLog(),
-      getRunner(expected).correctLog(),
-    );
+    const actualLog = getRunner(actual).correctLog();
+    const expectedLog = getRunner(expected).correctLog();
+    assertFramesEquals(actualLog, expectedLog);
   };
 
   // deno-lint-ignore no-explicit-any
@@ -435,6 +441,9 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
         "Helper function is still running, but `testStream` execution block ends." +
           " This is often caused by calling helper functions without using `await`.",
       );
+    }
+    for (const runner of readableRunnerMap.values()) {
+      runner.dispose();
     }
   };
 
@@ -495,11 +504,7 @@ function testStreamDefinition(
 }
 
 function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
-  const [series, values = {}] = streamArgs;
-
-  // Use ANY_VALUE if the 3rd argument is unspecified.
-  // Otherwise use the value of it. This is to allow undefined.
-  const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
+  const [series, values = {}, error = undefined] = streamArgs;
 
   if (series.includes("()")) {
     throw new SyntaxError(`Empty group: "${series}"`);
@@ -588,6 +593,7 @@ function createRunnerFromFrames(
 
   const { readable, controller, cancelSignal } = createControllReadable();
   const log: Frame[] = [];
+  let closed = false;
   let done = false;
   let frameIndex = -1;
   let tickCount = 0;
@@ -603,7 +609,7 @@ function createRunnerFromFrames(
 
   cancelSignal.addEventListener("abort", () => {
     if (!done) {
-      done = true;
+      closed = done = true;
       addLog({ type: "cancel", value: cancelSignal.reason });
     }
   });
@@ -619,16 +625,19 @@ function createRunnerFromFrames(
           break;
         }
         case "close": {
+          closed = true;
           addLog({ type });
           controller.close();
           break;
         }
         case "cancel": {
+          closed = true;
           addLog({ type, value });
           controller.close();
           break;
         }
         case "error": {
+          closed = true;
           addLog({ type, value });
           controller.error(value);
           break;
@@ -642,21 +651,15 @@ function createRunnerFromFrames(
   };
 
   const postTick = (): boolean => {
-    if (done) return false;
-    const { type } = frames[frameIndex];
-    if (type === "tick") {
-      addLog({ type });
+    const frame = frames[frameIndex];
+    if (!closed && (!frame || frame.type === "tick") && tickCount < maxTicks) {
+      addLog({ type: "tick" });
       if (++tickCount >= maxTicks) {
         logger().debug("createRunnerFromFrames(): exceeded", {
           testStreamId: currentTestStreamId,
           streamId,
         });
         done = true;
-        controller.error(
-          new MaxTicksExceededError("Ticks exceeded", {
-            cause: { maxTicks },
-          }),
-        );
       }
     }
     return !done;
@@ -664,7 +667,14 @@ function createRunnerFromFrames(
 
   const correctLog = (): Frame[] => log;
 
-  return { id: streamId, readable, tick, postTick, correctLog };
+  const dispose = () => {
+    if (!closed) {
+      controller.close();
+      closed = true;
+    }
+  };
+
+  return { id: streamId, readable, tick, postTick, correctLog, dispose };
 }
 
 function createRunnerFromStream<T>(
@@ -678,6 +688,7 @@ function createRunnerFromStream<T>(
   });
 
   const log: Frame[] = [];
+  let closed = false;
   let done = false;
   let tickCount = 0;
 
@@ -698,7 +709,7 @@ function createRunnerFromStream<T>(
           const res = await reader.read();
           if (res.done) {
             if (!done) {
-              done = true;
+              closed = done = true;
               addLog({ type: "close" });
               controller.close();
             }
@@ -710,7 +721,7 @@ function createRunnerFromStream<T>(
         }
       })().catch((e) => {
         if (!done) {
-          done = true;
+          closed = done = true;
           addLog({ type: "error", value: e });
           controller.error(e);
         }
@@ -720,7 +731,7 @@ function createRunnerFromStream<T>(
       });
     },
     cancel(reason) {
-      done = true;
+      closed = done = true;
       addLog({ type: "cancel", value: reason });
       return reader.cancel(reason);
     },
@@ -737,16 +748,19 @@ function createRunnerFromStream<T>(
         streamId,
       });
       done = true;
-      reader.cancel(
-        new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } }),
-      );
     }
     return !done;
   };
 
   const correctLog = (): Frame[] => log;
 
-  return { id: streamId, readable, tick, postTick, correctLog };
+  const dispose = () => {
+    if (!closed) {
+      reader.cancel("testStream disposed");
+    }
+  };
+
+  return { id: streamId, readable, tick, postTick, correctLog, dispose };
 }
 
 function assertFramesEquals(
