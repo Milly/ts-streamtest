@@ -11,6 +11,7 @@ import { FakeTime } from "https://deno.land/std@0.199.0/testing/time.ts";
 import { getLogger } from "https://deno.land/std@0.199.0/log/mod.ts";
 import {
   LeakingAsyncOpsError,
+  MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
 
@@ -393,7 +394,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   /** `assertReadable` helper. */
-  const assertReadable: TestStreamHelperAssertReadable = async (
+  const assertReadable: TestStreamHelperAssertReadable = (
     actual: ReadableStream,
     ...streamArgs: CreateStreamArgs
   ): Promise<void> => {
@@ -406,11 +407,12 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     const expectedFrames = parseSeries(series, values, error);
     const expected = createStream(expectedFrames);
 
-    await processStreams([actual, expected]);
-
-    const actualLog = getRunner(actual).correctLog();
-    const expectedLog = getRunner(expected).correctLog();
-    assertFramesEquals(actualLog, expectedLog);
+    return processStreams([actual, expected])
+      .then(() => {
+        const actualLog = getRunner(actual).correctLog();
+        const expectedLog = getRunner(expected).correctLog();
+        assertFramesEquals(actualLog, expectedLog);
+      });
   };
 
   // deno-lint-ignore no-explicit-any
@@ -590,6 +592,10 @@ function createRunnerFromFrames(
     streamId,
     frames,
   });
+
+  if (frames.filter((f) => f.type === "tick").length > maxTicks) {
+    throw new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } });
+  }
 
   const { readable, controller, cancelSignal } = createControllReadable();
   const log: Frame[] = [];
