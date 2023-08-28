@@ -1468,6 +1468,27 @@ describe("testStream", () => {
           assertEquals(actual2, ["dY", "eY", "fY"]);
         });
       });
+      it("should fulfilled the long delay in `fn`", async () => {
+        await testStream({
+          maxTicks: 50,
+          async fn({ run }) {
+            await run([], async () => {
+              await delay(10000);
+            });
+          },
+        });
+      });
+      it("should fulfilled multiple long delays in `fn`", async () => {
+        await testStream({
+          maxTicks: 50,
+          async fn({ run }) {
+            await run([], async () => {
+              await delay(10000);
+              await delay(10000);
+            });
+          },
+        });
+      });
     });
   });
 });
