@@ -944,17 +944,42 @@ describe("testStream", () => {
           assertEquals(chunks, ["a", "b", "c"]);
         });
       });
-      it("should throws if called within `run`", async () => {
+      it("should returns a readable stream inside `run`", async () => {
         await testStream(async ({ readable, run }) => {
-          await run([], () => {
-            assertThrows(
-              () => {
-                readable("abc|");
-              },
-              OperationNotPermittedError,
-              "Helpers does not allow concurrent call",
-            );
+          const createStream = () => readable("x---y---z|");
+          const chunks: unknown[] = [];
+
+          await run([], async () => {
+            await delay(200);
+            const stream = createStream();
+            assertInstanceOf(stream, ReadableStream);
+            pipeToChunks(stream, chunks);
           });
+
+          assertEquals(chunks, ["x", "y", "z"]);
+        });
+      });
+      it("should returns a readable stream inside and outside `run`", async () => {
+        await testStream(async ({ readable, run }) => {
+          const stream1 = readable("          a---b---c|");
+          const createStream2 = () => readable("x---y---z|");
+          const createStream3 = () => readable("           3-5-7|");
+
+          // stream1 created outside `run`
+          const { chunks } = pipeToChunks(stream1);
+
+          // stream3 created asynchronously outside `run`
+          delay(1300).then(() => {
+            pipeToChunks(createStream3(), chunks);
+          });
+
+          await run([], async () => {
+            // stream2 created asynchronously inside `run`
+            await delay(200);
+            pipeToChunks(createStream2(), chunks);
+          });
+
+          assertEquals(chunks, ["a", "x", "b", "y", "c", "z", "3", "5", "7"]);
         });
       });
       it("should throws if called outside `testStream`", async () => {

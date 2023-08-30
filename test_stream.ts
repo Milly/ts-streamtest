@@ -316,21 +316,22 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   /** Process all ticks. */
   const processAllTicks = async (): Promise<void> => {
-    logger().debug("processAllTicks(): start", { testStreamId });
-
     // This function runs in an asynchronous event loop.
     // Should always check whether the execution block has been disposed.
     while (!disposed) {
-      logger().debug("processAllTicks(): tick", { testStreamId });
-      const runners = [...readableRunnerMap.values()];
+      let runners: Runner[] = [];
 
-      for (const runner of runners) {
-        runner.tick();
+      logger().debug("processAllTicks(): tick", { testStreamId });
+      for (let index = 0; index < readableRunnerMap.size;) {
+        runners = [...readableRunnerMap.values()];
+        for (; index < runners.length; ++index) {
+          runners[index].tick();
+        }
+        await time.tickAsync(0);
+        if (disposed) return;
+        await time.runMicrotasks();
+        if (disposed) return;
       }
-      await time.tickAsync(0);
-      if (disposed) break;
-      await time.runMicrotasks();
-      if (disposed) break;
 
       logger().debug("processAllTicks(): postTick", { testStreamId });
       const results = runners.map((runner) => runner.postTick());
@@ -338,8 +339,6 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
       if (!results.includes(true)) break;
     }
-
-    logger().debug("processAllTicks(): end", { testStreamId, disposed });
   };
 
   /** `readable` helper. */
@@ -369,21 +368,25 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       getRunner(s).readable
     ) as MutableTuple<T>;
 
+    await time.runMicrotasks();
     if (fn) {
       let fnContinue = true;
       const fnRunner = async () => {
         logger().debug("processStreams(): fn: start", { testStreamId });
-        await fn(...wrappedStreams);
+        try {
+          await fn(...wrappedStreams);
+        } finally {
+          fnContinue = false;
+        }
         logger().debug("processStreams(): fn: end", { testStreamId });
-        fnContinue = false;
       };
 
       const ticksRunner = async () => {
-        await processAllTicks();
-        while (fnContinue && !disposed && await time.nextAsync());
+        do {
+          await processAllTicks();
+        } while (!disposed && (await time.nextAsync() || fnContinue));
       };
 
-      await time.runMicrotasks();
       await Promise.all([fnRunner(), ticksRunner()]);
     } else {
       await processAllTicks();
@@ -418,7 +421,9 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const helperMethod = <T extends (...args: any[]) => unknown>(
     fn: T,
     name: string,
+    opts?: { allowConcurrent?: true },
   ): T => {
+    const { allowConcurrent = false } = opts ?? {};
     const obj = {
       [name](...args: Parameters<T>) {
         logger().debug(`${name}(): call`, { testStreamId, args });
@@ -427,7 +432,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
             "Helpers does not allow call outside `testStream`",
           );
         }
-        return lock(fn, args);
+        return allowConcurrent ? fn(...args) : lock(fn, args);
       },
     };
     return obj[name] as T;
@@ -435,7 +440,9 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   const helper: TestStreamHelper = {
     assertReadable: helperMethod(assertReadable, "assertReadable"),
-    readable: helperMethod(createReadable, "readable"),
+    readable: helperMethod(createReadable, "readable", {
+      allowConcurrent: true,
+    }),
     run: helperMethod(processStreams, "run"),
   };
 
