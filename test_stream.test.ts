@@ -86,6 +86,20 @@ function toPrint(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function pipeToChunks(
+  stream: ReadableStream<unknown>,
+  chunks: unknown[] = [],
+): { chunks: unknown[]; completed: Promise<void> } {
+  const completed = stream.pipeTo(
+    new WritableStream({
+      write(chunk) {
+        chunks.push(chunk);
+      },
+    }),
+  );
+  return { chunks, completed };
+}
+
 describe("testStream", () => {
   beforeEach(() => {
     baseTime = Date.now();
@@ -134,83 +148,69 @@ describe("testStream", () => {
   describe("TestStreamDefinition", () => {
     describe(".maxTicks", () => {
       it("should close streams at 50 ticks if not specified", async () => {
-        let framedStream: ReadableStream<string>;
-        let cancelReason: unknown;
+        let helperStream: ReadableStream<string>;
+        let nativeStreamCancelReason: unknown;
 
         await testStream({
           async fn({ readable, run, assertReadable }) {
             const ticks49 = Array(49 + 1).join("-");
-            framedStream = readable(`      ${ticks49}a`);
-            const framedStreamExpected = ` ${ticks49}a`;
-            const actualStreamExpected = ` ${ticks49}-`;
+            helperStream = readable(`     ${ticks49}a`);
+            const helperStreamExpected = `${ticks49}a`;
+            const nativeStreamExpected = `${ticks49}-`;
 
-            const actualChunks: string[] = [];
-            const actualStream = framedStream.pipeThrough({
-              writable: new WritableStream<string>({
-                write(chunk) {
-                  actualChunks.push(chunk);
-                },
-              }),
-              readable: new ReadableStream({
-                cancel(reason) {
-                  cancelReason = reason;
-                },
-              }),
+            const nativeStream = new ReadableStream({
+              cancel(reason) {
+                nativeStreamCancelReason = reason;
+              },
             });
+            const { chunks } = pipeToChunks(helperStream);
 
-            await run([framedStream, actualStream], async () => {
+            await run([helperStream, nativeStream], async () => {
               await delay(10000);
             });
 
-            assertEquals(actualChunks, ["a"]);
-            await assertReadable(framedStream, framedStreamExpected);
-            await assertReadable(actualStream, actualStreamExpected);
-            assertEquals(framedStream.locked, true);
+            assertEquals(chunks, ["a"]);
+            await assertReadable(helperStream, helperStreamExpected);
+            await assertReadable(nativeStream, nativeStreamExpected);
+            assertEquals(helperStream.locked, true);
           },
         });
 
-        assertEquals(framedStream!.locked, false);
-        assertEquals(cancelReason, "testStream disposed");
+        assertEquals(helperStream!.locked, false);
+        assertEquals(nativeStreamCancelReason, "testStream disposed");
       });
       it("should close streams at the specified number of ticks", async () => {
-        let framedStream: ReadableStream<string>;
-        let cancelReason: unknown;
+        let helperStream: ReadableStream<string>;
+        let nativeStreamCancelReason: unknown;
 
         await testStream({
           maxTicks: 30,
           async fn({ readable, run, assertReadable }) {
             const ticks29 = Array(29 + 1).join("-");
-            framedStream = readable(`     ${ticks29}a`);
-            const framedStreamExpected = `${ticks29}a`;
-            const actualStreamExpected = `${ticks29}-`;
+            helperStream = readable(`     ${ticks29}a`);
+            const helperStreamExpected = `${ticks29}a`;
+            const nativeStreamExpected = `${ticks29}-`;
 
-            const actualChunks: string[] = [];
-            const actualStream = framedStream.pipeThrough({
-              writable: new WritableStream<string>({
-                write(chunk) {
-                  actualChunks.push(chunk);
-                },
-              }),
-              readable: new ReadableStream({
-                cancel(reason) {
-                  cancelReason = reason;
-                },
-              }),
+            const nativeStream = new ReadableStream({
+              cancel(reason) {
+                nativeStreamCancelReason = reason;
+              },
             });
+            const { chunks } = pipeToChunks(helperStream);
 
-            await run([framedStream, actualStream], async () => {
+            await run([helperStream, nativeStream], async () => {
               await delay(10000);
             });
 
-            assertEquals(actualChunks, ["a"]);
-            await assertReadable(framedStream, framedStreamExpected);
-            await assertReadable(actualStream, actualStreamExpected);
-            assertEquals(framedStream.locked, true);
+            assertEquals(chunks, ["a"]);
+            await assertReadable(helperStream, helperStreamExpected);
+            await assertReadable(nativeStream, nativeStreamExpected);
+            assertEquals(helperStream.locked, true);
           },
         });
 
-        assertEquals(framedStream!.locked, false);
-        assertEquals(cancelReason, "testStream disposed");
+        assertEquals(helperStream!.locked, false);
+        assertEquals(nativeStreamCancelReason, "testStream disposed");
       });
       it("should throws if 0 is specified", () => {
         assertThrows(
@@ -733,9 +733,7 @@ describe("testStream", () => {
           const stream = readable("abcd|");
 
           await run([stream], async (stream) => {
-            await stream.pipeTo(
-              new WritableStream(),
-            );
+            await stream.pipeTo(new WritableStream());
           });
 
           await assertReadable(stream, "abcd|");
@@ -792,9 +790,7 @@ describe("testStream", () => {
           );
 
           await run([transformed], async (transformed) => {
-            await transformed.pipeTo(
-              new WritableStream(),
-            );
+            await transformed.pipeTo(new WritableStream());
           });
 
           await assertReadable(transformed, "ABCD|", {
@@ -916,17 +912,10 @@ describe("testStream", () => {
 
           assertInstanceOf(stream, ReadableStream);
 
-          const actual: unknown[] = [];
-          stream.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                actual.push(chunk);
-              },
-            }),
-          );
+          const { chunks } = pipeToChunks(stream);
           await run([]);
 
-          assertEquals(actual, ["a", "b", "c"]);
+          assertEquals(chunks, ["a", "b", "c"]);
         });
       });
       it("should throws if called within `run`", async () => {
@@ -964,17 +953,10 @@ describe("testStream", () => {
 
             assertInstanceOf(stream, ReadableStream);
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
             await run([]);
 
-            assertEquals(actual, []);
+            assertEquals(chunks, []);
           });
         });
         for (
@@ -1068,23 +1050,16 @@ describe("testStream", () => {
           await testStream(async ({ readable, run }) => {
             const stream = readable("   a   b c  |   ");
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
 
             await run([], async () => {
-              assertEquals(actual, []);
+              assertEquals(chunks, []);
               await delay(1);
-              assertEquals(actual, ["a"]);
+              assertEquals(chunks, ["a"]);
               await delay(100);
-              assertEquals(actual, ["a", "b"]);
+              assertEquals(chunks, ["a", "b"]);
               await delay(100);
-              assertEquals(actual, ["a", "b", "c"]);
+              assertEquals(chunks, ["a", "b", "c"]);
               await delay(100);
               assertFalse(stream.locked, "Stream should closed");
             });
@@ -1094,26 +1069,19 @@ describe("testStream", () => {
           await testStream(async ({ readable, run }) => {
             const stream = readable("-----a--bc-|");
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
 
             await run([], async () => {
               await delay(500);
-              assertEquals(actual, []);
+              assertEquals(chunks, []);
               await delay(1);
-              assertEquals(actual, ["a"]);
+              assertEquals(chunks, ["a"]);
               await delay(200);
-              assertEquals(actual, ["a"]);
+              assertEquals(chunks, ["a"]);
               await delay(100);
-              assertEquals(actual, ["a", "b"]);
+              assertEquals(chunks, ["a", "b"]);
               await delay(100);
-              assertEquals(actual, ["a", "b", "c"]);
+              assertEquals(chunks, ["a", "b", "c"]);
               await delay(100);
               assert(stream.locked, "Stream should not closed");
               await delay(100);
@@ -1187,17 +1155,10 @@ describe("testStream", () => {
 
             assertInstanceOf(stream, ReadableStream);
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
             await run([]);
 
-            assertEquals(actual, [
+            assertEquals(chunks, [
               "foo",
               42,
               true,
@@ -1215,17 +1176,10 @@ describe("testStream", () => {
 
             assertInstanceOf(stream, ReadableStream);
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
             await run([]);
 
-            assertEquals(actual, ["a", "b", "c"]);
+            assertEquals(chunks, ["a", "b", "c"]);
           });
         });
         it("should be possible to specify undefined", async () => {
@@ -1234,17 +1188,10 @@ describe("testStream", () => {
 
             assertInstanceOf(stream, ReadableStream);
 
-            const actual: unknown[] = [];
-            stream.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  actual.push(chunk);
-                },
-              }),
-            );
+            const { chunks } = pipeToChunks(stream);
             await run([]);
 
-            assertEquals(actual, ["a", "b", "c"]);
+            assertEquals(chunks, ["a", "b", "c"]);
           });
         });
       });
@@ -1363,37 +1310,18 @@ describe("testStream", () => {
         await testStream(async ({ readable, run }) => {
           const IS_PENDING = {} as const;
           const stream1 = readable("abc|");
-          const stream2 = readable("de|");
+          const stream2 = readable("AB|");
 
-          const actual1: string[] = [];
-          const p1 = stream1.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                actual1.push(chunk);
-              },
-            }),
-          );
-          const actual2: string[] = [];
-          const p2 = stream2.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                actual2.push(chunk);
-              },
-            }),
-          );
+          const chunks: unknown[] = [];
+          const { completed: p1 } = pipeToChunks(stream1, chunks);
+          const { completed: p2 } = pipeToChunks(stream2, chunks);
 
           await run([/* No specify streams */], async () => {
             assertEquals(
-              actual1,
+              chunks,
               [],
-              "actual1 should be empty at the beginning of the run block",
+              "chunks should be empty at the beginning of the run block",
             );
-            assertEquals(
-              actual2,
-              [],
-              "actual2 should be empty at the beginning of the run block",
-            );
-
             assertStrictEquals(
               await Promise.race([p1, p2, Promise.resolve(IS_PENDING)]),
               IS_PENDING,
@@ -1412,22 +1340,14 @@ describe("testStream", () => {
             "p2 should be resolved after run",
           );
 
-          assertEquals(actual1, ["a", "b", "c"]);
-          assertEquals(actual2, ["d", "e"]);
+          assertEquals(chunks, ["a", "A", "b", "B", "c"]);
         });
       });
       it("should process the secondary generated test streams", async () => {
         await testStream(async ({ readable, run }) => {
           const IS_PENDING = {} as const;
           const stream1 = readable("abc|");
-          const actual1: string[] = [];
-          const p1 = stream1.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                actual1.push(chunk);
-              },
-            }),
-          );
+          const { chunks: chunks1, completed: p1 } = pipeToChunks(stream1);
 
           await run([/* No specify streams */]);
 
@@ -1436,18 +1356,10 @@ describe("testStream", () => {
             IS_PENDING,
             "p1 should be resolved after run",
           );
+          assertEquals(chunks1, ["a", "b", "c"]);
 
-          assertEquals(actual1, ["a", "b", "c"]);
-
-          const stream2 = readable("de|");
-          const actual2: string[] = [];
-          const p2 = stream2.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                actual2.push(chunk);
-              },
-            }),
-          );
+          const stream2 = readable("AB|");
+          const { chunks: chunks2, completed: p2 } = pipeToChunks(stream2);
 
           await run([/* No specify streams */]);
 
@@ -1457,34 +1369,22 @@ describe("testStream", () => {
             "p2 should be resolved after run",
           );
 
-          assertEquals(actual2, ["d", "e"]);
+          assertEquals(chunks2, ["A", "B"]);
         });
       });
       it("should pass the readables of the specified streams to `fn`", async () => {
         await testStream(async ({ readable, run }) => {
-          const stream1 = readable("abcd|");
-          const stream2 = readable("def|");
+          const chunks: unknown[] = [];
+          const stream1 = readable("abc|");
+          const stream2 = readable("AB|");
 
           const transformed2 = stream2.pipeThrough(
             new TransformStream({
               transform(chunk, controller) {
-                controller.enqueue(`${chunk}Y`);
+                controller.enqueue(chunk + "!");
               },
             }),
           );
-
-          const actual1: string[] = [];
-          const writable1 = new WritableStream<string>({
-            write(chunk) {
-              actual1.push(chunk);
-            },
-          });
-          const actual2: string[] = [];
-          const writable2 = new WritableStream<string>({
-            write(chunk) {
-              actual2.push(chunk);
-            },
-          });
 
           await run(
             [stream1, transformed2],
@@ -1493,14 +1393,13 @@ describe("testStream", () => {
               assertFalse(readable2.locked, "readable2 should not be locked");
 
               await Promise.all([
-                readable1.pipeTo(writable1),
-                readable2.pipeTo(writable2),
+                pipeToChunks(readable1, chunks).completed,
+                pipeToChunks(readable2, chunks).completed,
               ]);
             },
           );
 
-          assertEquals(actual1, ["a", "b", "c", "d"]);
-          assertEquals(actual2, ["dY", "eY", "fY"]);
+          assertEquals(chunks, ["a", "A!", "b", "B!", "c"]);
         });
       });
       it("should fulfilled the long delay in `fn`", async () => {
