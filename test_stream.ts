@@ -272,12 +272,11 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   /** `undefined` if unlocked, otherwise `Promise` that resolves on unlocked. */
   let lockPromise: Promise<unknown> | undefined;
 
-  const lock = <T>(fn: () => T): T => {
-    if (disposed) {
-      throw new OperationNotPermittedError(
-        "Helpers does not allow call outside `testStream`",
-      );
-    }
+  // deno-lint-ignore no-explicit-any
+  const lock = <F extends (...args: any[]) => unknown>(
+    fn: F,
+    args: Parameters<F>,
+  ): ReturnType<F> => {
     if (lockPromise) {
       throw new OperationNotPermittedError(
         "Helpers does not allow concurrent call",
@@ -285,14 +284,14 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     }
     lockPromise = Promise.resolve();
     try {
-      let result = fn();
+      let result = fn(...args);
       if (result instanceof Promise) {
-        result = result.finally(() => lockPromise = undefined) as T;
-        lockPromise = result as Promise<unknown>;
+        result = result.finally(() => lockPromise = undefined);
+        lockPromise = (result as Promise<unknown>).then(NOOP, NOOP);
       } else {
         lockPromise = undefined;
       }
-      return result;
+      return result as ReturnType<F>;
     } catch (e: unknown) {
       lockPromise = undefined;
       throw e;
@@ -416,14 +415,19 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   // deno-lint-ignore no-explicit-any
-  const helperMethod = <T extends (...args: any[]) => any>(
+  const helperMethod = <T extends (...args: any[]) => unknown>(
     fn: T,
     name: string,
   ): T => {
     const obj = {
       [name](...args: Parameters<T>) {
         logger().debug(`${name}(): call`, { testStreamId, args });
-        return lock(() => fn(...args));
+        if (disposed) {
+          throw new OperationNotPermittedError(
+            "Helpers does not allow call outside `testStream`",
+          );
+        }
+        return lock(fn, args);
       },
     };
     return obj[name] as T;
@@ -438,7 +442,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const executeFn = async () => {
     await fn(helper);
     if (lockPromise) {
-      await Promise.all([lockPromise.catch(NOOP), time.runAllAsync()]);
+      await Promise.all([lockPromise, time.runAllAsync()]);
       throw new LeakingAsyncOpsError(
         "Helper function is still running, but `testStream` execution block ends." +
           " This is often caused by calling helper functions without using `await`.",
