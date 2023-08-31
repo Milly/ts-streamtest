@@ -1,4 +1,5 @@
 import {
+  afterEach,
   beforeEach,
   describe,
   it,
@@ -100,9 +101,28 @@ function pipeToChunks(
   return { chunks, completed };
 }
 
+function catchUnhandledRejection(): unknown[] {
+  assertFalse(
+    globalThis.onunhandledrejection,
+    "Already attached listener to 'onunhandledrejection'.",
+  );
+  const reasons: unknown[] = [];
+  globalThis.onunhandledrejection = (ev) => {
+    ev.preventDefault();
+    reasons.push(ev.reason);
+  };
+  return reasons;
+}
+function resetUnhandledRejection(): void {
+  globalThis.onunhandledrejection = null;
+}
+
 describe("testStream", () => {
   beforeEach(() => {
     baseTime = Date.now();
+  });
+  afterEach(() => {
+    resetUnhandledRejection();
   });
   describe("arguments", () => {
     describe("(options)", () => {
@@ -392,6 +412,7 @@ describe("testStream", () => {
       );
     });
     it("should rejects if calling `assertReadable` that rejects without `await`", async () => {
+      const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
         () => {
           return testStream(({ assertReadable, readable }) => {
@@ -402,6 +423,8 @@ describe("testStream", () => {
         LeakingAsyncOpsError,
         "Helper function is still running",
       );
+      await delay(0);
+      assertEquals(unhundledErrors, []);
     });
     it("should rejects if calling `run` without `await`", async () => {
       await assertRejects(
@@ -416,6 +439,7 @@ describe("testStream", () => {
       );
     });
     it("should rejects if calling `run` that rejects without `await`", async () => {
+      const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
         () => {
           return testStream(({ run, readable }) => {
@@ -428,6 +452,8 @@ describe("testStream", () => {
         LeakingAsyncOpsError,
         "Helper function is still running",
       );
+      await delay(0);
+      assertEquals(unhundledErrors, []);
     });
   });
   describe("TestStreamHelper", () => {
