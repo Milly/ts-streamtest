@@ -1472,6 +1472,39 @@ describe("testStream", () => {
           },
         });
       });
+      it("should not rejects if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
+      it("should not reject after tasks if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+          // Returns a delay Promise directly, which avoids additional microtasks.
+          return delay(0);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
+      it("should not reject after tasks and microtasks if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(async ({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+          await delay(0);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
     });
   });
 });
