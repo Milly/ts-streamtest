@@ -337,6 +337,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
 
+      // Exit if the continue flag is not included in results.
       if (!results.includes(true)) break;
     }
   };
@@ -447,26 +448,33 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   const executeFn = async () => {
-    await fn(helper);
+    try {
+      await fn(helper);
+    } finally {
+      // Sets the disposed flag immediately after the fn finishes.
+      disposed = true;
+    }
     if (lockPromise) {
-      await Promise.all([lockPromise, time.runAllAsync()]);
       throw new LeakingAsyncOpsError(
         "Helper function is still running, but `testStream` execution block ends." +
           " This is often caused by calling helper functions without using `await`.",
       );
-    }
-    for (const runner of readableRunnerMap.values()) {
-      runner.dispose();
     }
   };
 
   const time = new FakeTime();
   return executeFn()
     .finally(() => {
-      disposed = true;
+      // Dispose resources.
+      for (const runner of readableRunnerMap.values()) {
+        runner.dispose();
+      }
       time.restore();
     })
     .finally(() => {
+      // After dispose, unlock testStream.
+      // This block must be separate Promise from the dispose block.
+      // Ensures that all resources have been released when testStream settles.
       testStreamLocked = false;
       logger().debug("testStream(): end", { testStreamId });
     });

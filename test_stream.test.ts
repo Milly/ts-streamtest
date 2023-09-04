@@ -379,8 +379,8 @@ describe("testStream", () => {
       };
 
       const actual = await assertRejects(
-        () => {
-          return testStream(fn);
+        async () => {
+          await testStream(fn);
         },
         MyCustomError,
       );
@@ -401,10 +401,10 @@ describe("testStream", () => {
     });
     it("should rejects if calling `assertReadbale` without `await`", async () => {
       await assertRejects(
-        () => {
-          return testStream(({ assertReadable, readable }) => {
+        async () => {
+          await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
-            assertReadable(actual, "a-|");
+            /* no await */ assertReadable(actual, "a-|");
           });
         },
         LeakingAsyncOpsError,
@@ -414,10 +414,10 @@ describe("testStream", () => {
     it("should rejects if calling `assertReadable` that rejects without `await`", async () => {
       const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
-        () => {
-          return testStream(({ assertReadable, readable }) => {
+        async () => {
+          await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
-            assertReadable(actual, "x-|");
+            /* no await */ assertReadable(actual, "x-|");
           });
         },
         LeakingAsyncOpsError,
@@ -428,10 +428,9 @@ describe("testStream", () => {
     });
     it("should rejects if calling `run` without `await`", async () => {
       await assertRejects(
-        () => {
-          return testStream(({ run, readable }) => {
-            const actual = readable("a-|");
-            run([actual]);
+        async () => {
+          await testStream(({ run }) => {
+            /* no await */ run([]);
           });
         },
         LeakingAsyncOpsError,
@@ -441,10 +440,9 @@ describe("testStream", () => {
     it("should rejects if calling `run` that rejects without `await`", async () => {
       const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
-        () => {
-          return testStream(({ run, readable }) => {
-            const actual = readable("a-|");
-            run([actual], () => {
+        async () => {
+          await testStream(({ run }) => {
+            /* no await */ run([], () => {
               throw new MyCustomError();
             });
           });
@@ -505,8 +503,8 @@ describe("testStream", () => {
             const stream = ReadableStream.from(["a", "b", "c", "d"]);
 
             await assertRejects(
-              () => {
-                return assertReadable(stream, "(abc|)");
+              async () => {
+                await assertReadable(stream, "(abc|)");
               },
               AssertionError,
               "Stream not matched",
@@ -1319,8 +1317,8 @@ describe("testStream", () => {
           };
 
           const actual = await assertRejects(
-            () => {
-              return run([], fn);
+            async () => {
+              await run([], fn);
             },
             MyCustomError,
           );
@@ -1473,6 +1471,39 @@ describe("testStream", () => {
             });
           },
         });
+      });
+      it("should not rejects if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
+      it("should not reject after tasks if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+          // Returns a delay Promise directly, which avoids additional microtasks.
+          return delay(0);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
+      it("should not reject after tasks and microtasks if called without `await`", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(async ({ run, readable }) => {
+          const actual = readable("a-|");
+          runPromise = run([actual]);
+          await delay(0);
+        }).catch(() => {});
+
+        // runPromise should not rejects.
+        await runPromise;
       });
     });
   });
