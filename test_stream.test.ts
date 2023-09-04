@@ -379,8 +379,8 @@ describe("testStream", () => {
       };
 
       const actual = await assertRejects(
-        () => {
-          return testStream(fn);
+        async () => {
+          await testStream(fn);
         },
         MyCustomError,
       );
@@ -401,8 +401,8 @@ describe("testStream", () => {
     });
     it("should rejects if calling `assertReadbale` without `await`", async () => {
       await assertRejects(
-        () => {
-          return testStream(({ assertReadable, readable }) => {
+        async () => {
+          await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "a-|");
           });
@@ -414,8 +414,8 @@ describe("testStream", () => {
     it("should rejects if calling `assertReadable` that rejects without `await`", async () => {
       const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
-        () => {
-          return testStream(({ assertReadable, readable }) => {
+        async () => {
+          await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
             assertReadable(actual, "x-|");
           });
@@ -428,8 +428,8 @@ describe("testStream", () => {
     });
     it("should rejects if calling `run` without `await`", async () => {
       await assertRejects(
-        () => {
-          return testStream(({ run, readable }) => {
+        async () => {
+          await testStream(({ run, readable }) => {
             const actual = readable("a-|");
             run([actual]);
           });
@@ -441,8 +441,8 @@ describe("testStream", () => {
     it("should rejects if calling `run` that rejects without `await`", async () => {
       const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
-        () => {
-          return testStream(({ run, readable }) => {
+        async () => {
+          await testStream(({ run, readable }) => {
             const actual = readable("a-|");
             run([actual], () => {
               throw new MyCustomError();
@@ -505,8 +505,8 @@ describe("testStream", () => {
             const stream = ReadableStream.from(["a", "b", "c", "d"]);
 
             await assertRejects(
-              () => {
-                return assertReadable(stream, "(abc|)");
+              async () => {
+                await assertReadable(stream, "(abc|)");
               },
               AssertionError,
               "Stream not matched",
@@ -1319,8 +1319,8 @@ describe("testStream", () => {
           };
 
           const actual = await assertRejects(
-            () => {
-              return run([], fn);
+            async () => {
+              await run([], fn);
             },
             MyCustomError,
           );
