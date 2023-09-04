@@ -272,12 +272,11 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   /** `undefined` if unlocked, otherwise `Promise` that resolves on unlocked. */
   let lockPromise: Promise<unknown> | undefined;
 
-  const lock = <T>(fn: () => T): T => {
-    if (disposed) {
-      throw new OperationNotPermittedError(
-        "Helpers does not allow call outside `testStream`",
-      );
-    }
+  // deno-lint-ignore no-explicit-any
+  const lock = <F extends (...args: any[]) => unknown>(
+    fn: F,
+    args: Parameters<F>,
+  ): ReturnType<F> => {
     if (lockPromise) {
       throw new OperationNotPermittedError(
         "Helpers does not allow concurrent call",
@@ -285,14 +284,14 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     }
     lockPromise = Promise.resolve();
     try {
-      let result = fn();
+      let result = fn(...args);
       if (result instanceof Promise) {
-        result = result.finally(() => lockPromise = undefined) as T;
-        lockPromise = result as Promise<unknown>;
+        result = result.finally(() => lockPromise = undefined);
+        lockPromise = (result as Promise<unknown>).then(NOOP, NOOP);
       } else {
         lockPromise = undefined;
       }
-      return result;
+      return result as ReturnType<F>;
     } catch (e: unknown) {
       lockPromise = undefined;
       throw e;
@@ -317,21 +316,22 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   /** Process all ticks. */
   const processAllTicks = async (): Promise<void> => {
-    logger().debug("processAllTicks(): start", { testStreamId });
-
     // This function runs in an asynchronous event loop.
     // Should always check whether the execution block has been disposed.
     while (!disposed) {
-      logger().debug("processAllTicks(): tick", { testStreamId });
-      const runners = [...readableRunnerMap.values()];
+      let runners: Runner[] = [];
 
-      for (const runner of runners) {
-        runner.tick();
+      logger().debug("processAllTicks(): tick", { testStreamId });
+      for (let index = 0; index < readableRunnerMap.size;) {
+        runners = [...readableRunnerMap.values()];
+        for (; index < runners.length; ++index) {
+          runners[index].tick();
+        }
+        await time.tickAsync(0);
+        if (disposed) return;
+        await time.runMicrotasks();
+        if (disposed) return;
       }
-      await time.tickAsync(0);
-      if (disposed) break;
-      await time.runMicrotasks();
-      if (disposed) break;
 
       logger().debug("processAllTicks(): postTick", { testStreamId });
       const results = runners.map((runner) => runner.postTick());
@@ -339,8 +339,6 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
       if (!results.includes(true)) break;
     }
-
-    logger().debug("processAllTicks(): end", { testStreamId, disposed });
   };
 
   /** `readable` helper. */
@@ -370,21 +368,25 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       getRunner(s).readable
     ) as MutableTuple<T>;
 
+    await time.runMicrotasks();
     if (fn) {
       let fnContinue = true;
       const fnRunner = async () => {
         logger().debug("processStreams(): fn: start", { testStreamId });
-        await fn(...wrappedStreams);
+        try {
+          await fn(...wrappedStreams);
+        } finally {
+          fnContinue = false;
+        }
         logger().debug("processStreams(): fn: end", { testStreamId });
-        fnContinue = false;
       };
 
       const ticksRunner = async () => {
-        await processAllTicks();
-        while (fnContinue && !disposed && await time.nextAsync());
+        do {
+          await processAllTicks();
+        } while (!disposed && (await time.nextAsync() || fnContinue));
       };
 
-      await time.runMicrotasks();
       await Promise.all([fnRunner(), ticksRunner()]);
     } else {
       await processAllTicks();
@@ -416,14 +418,21 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   // deno-lint-ignore no-explicit-any
-  const helperMethod = <T extends (...args: any[]) => any>(
+  const helperMethod = <T extends (...args: any[]) => unknown>(
     fn: T,
     name: string,
+    opts?: { allowConcurrent?: true },
   ): T => {
+    const { allowConcurrent = false } = opts ?? {};
     const obj = {
       [name](...args: Parameters<T>) {
         logger().debug(`${name}(): call`, { testStreamId, args });
-        return lock(() => fn(...args));
+        if (disposed) {
+          throw new OperationNotPermittedError(
+            "Helpers does not allow call outside `testStream`",
+          );
+        }
+        return allowConcurrent ? fn(...args) : lock(fn, args);
       },
     };
     return obj[name] as T;
@@ -431,14 +440,16 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   const helper: TestStreamHelper = {
     assertReadable: helperMethod(assertReadable, "assertReadable"),
-    readable: helperMethod(createReadable, "readable"),
+    readable: helperMethod(createReadable, "readable", {
+      allowConcurrent: true,
+    }),
     run: helperMethod(processStreams, "run"),
   };
 
   const executeFn = async () => {
     await fn(helper);
     if (lockPromise) {
-      await Promise.all([lockPromise.catch(NOOP), time.runAllAsync()]);
+      await Promise.all([lockPromise, time.runAllAsync()]);
       throw new LeakingAsyncOpsError(
         "Helper function is still running, but `testStream` execution block ends." +
           " This is often caused by calling helper functions without using `await`.",
