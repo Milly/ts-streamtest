@@ -404,7 +404,7 @@ describe("testStream", () => {
         async () => {
           await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
-            assertReadable(actual, "a-|");
+            /* no await */ assertReadable(actual, "a-|");
           });
         },
         LeakingAsyncOpsError,
@@ -417,7 +417,7 @@ describe("testStream", () => {
         async () => {
           await testStream(({ assertReadable, readable }) => {
             const actual = readable("a-|");
-            assertReadable(actual, "x-|");
+            /* no await */ assertReadable(actual, "x-|");
           });
         },
         LeakingAsyncOpsError,
@@ -429,9 +429,8 @@ describe("testStream", () => {
     it("should rejects if calling `run` without `await`", async () => {
       await assertRejects(
         async () => {
-          await testStream(({ run, readable }) => {
-            const actual = readable("a-|");
-            run([actual]);
+          await testStream(({ run }) => {
+            /* no await */ run([]);
           });
         },
         LeakingAsyncOpsError,
@@ -442,9 +441,8 @@ describe("testStream", () => {
       const unhundledErrors = catchUnhandledRejection();
       await assertRejects(
         async () => {
-          await testStream(({ run, readable }) => {
-            const actual = readable("a-|");
-            run([actual], () => {
+          await testStream(({ run }) => {
+            /* no await */ run([], () => {
               throw new MyCustomError();
             });
           });
