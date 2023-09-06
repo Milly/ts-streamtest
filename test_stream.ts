@@ -158,7 +158,6 @@ export interface TestStreamHelperReadable {
    * @param [error] The value that replaces the reason when the stream aborts.
    * @returns The created ReadableStream.
    * @throws {SyntaxError} `series` is invalid format.
-   * @throws {OperationNotPermittedError} Called concurrently or outside `testStream`.
    */
   (
     series: string,
