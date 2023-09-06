@@ -128,6 +128,34 @@ Deno.test("assertReadable", async () => {
 });
 ```
 
+### `abort` helper
+
+Creates a `AbortSignal` with the specified `series`.
+
+```typescript
+import { assertEquals } from "https://deno.land/std/assert/assert_equals.ts";
+import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { delay } from "https://deno.land/std/async/delay.ts";
+
+Deno.test("readable", async () => {
+  await testStream(async ({ abort, run }) => {
+    const abortReason = new Error("abort");
+
+    // ..sleep 3 ticks.. abort with `abortReason`
+    const signal = abort("---!", abortReason);
+
+    await run([], async () => {
+      await delay(299);
+      assertEquals(signal.aborted, false);
+
+      await delay(1);
+      assertEquals(signal.aborted, true);
+      assertEquals(signal.reason, abortReason);
+    });
+  });
+});
+```
+
 ### `run` helper
 
 Process the test streams inside the `run` block.
