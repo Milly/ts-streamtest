@@ -29,6 +29,7 @@ import {
 import {
   testStream,
   type TestStreamHelper,
+  TestStreamHelperAbort,
   type TestStreamHelperAssertReadable,
   type TestStreamHelperReadable,
   type TestStreamHelperRun,
@@ -342,6 +343,7 @@ describe("testStream", () => {
       assertEquals(
         Object.keys(helper).sort(),
         [
+          "abort",
           "assertReadable",
           "readable",
           "run",
@@ -404,6 +406,173 @@ describe("testStream", () => {
     });
   });
   describe("TestStreamHelper", () => {
+    describe(".abort", () => {
+      it("should returns an AbortSignal", async () => {
+        await testStream(({ abort }) => {
+          const signal = abort("----!");
+
+          assertInstanceOf(signal, AbortSignal);
+        });
+      });
+      it("should throws if called outside `testStream`", async () => {
+        let savedAbort: TestStreamHelperAbort;
+
+        await testStream(({ abort }) => {
+          savedAbort = abort;
+        });
+
+        assertThrows(
+          () => {
+            savedAbort("---|");
+          },
+          OperationNotPermittedError,
+          "Helpers does not allow call outside `testStream`",
+        );
+      });
+      describe("(series, ...)", () => {
+        it("should be possible to specify an empty string", async () => {
+          await testStream(({ abort }) => {
+            const stream = abort("");
+
+            assertInstanceOf(stream, AbortSignal);
+          });
+        });
+        for (
+          const series of [
+            "()",
+            "|",
+            "#",
+            "a",
+          ]
+        ) {
+          it(`should throws if specified invalid character: ${toPrint(series)}`, async () => {
+            await testStream(({ abort }) => {
+              assertThrows(
+                () => {
+                  abort(series);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
+        it(`should throws if non-trailing abort`, async () => {
+          await testStream(({ abort }) => {
+            assertThrows(
+              () => {
+                abort("--!-");
+              },
+              SyntaxError,
+              "Non-trailing close",
+            );
+          });
+        });
+        for (
+          const series of [
+            "!",
+            "---!",
+          ]
+        ) {
+          it(`should not throws if trailing abort: ${toPrint(series)}`, async () => {
+            await testStream(({ abort }) => {
+              const stream = abort(series);
+
+              assertInstanceOf(stream, AbortSignal);
+            });
+          });
+        }
+        it("should ignores ` `", async () => {
+          await testStream(async ({ abort, run }) => {
+            const signal = abort("   -   - -  !   ", "break");
+
+            await run([], async () => {
+              await delay(299);
+              assertFalse(signal.aborted);
+              await delay(1);
+              assert(signal.aborted);
+            });
+          });
+        });
+        it("should advances one tick with `-` and aborts with `!`", async () => {
+          await testStream(async ({ abort, run }) => {
+            const signal = abort("-----!", "break");
+
+            await run([], async () => {
+              await delay(499);
+              assertFalse(signal.aborted);
+              await delay(1);
+              assert(signal.aborted);
+            });
+          });
+        });
+        it("should not aborts the signal without `!`", async () => {
+          let signal!: AbortSignal;
+
+          await testStream({
+            maxTicks: 10,
+            async fn({ abort, run }) {
+              signal = abort("---", "break");
+
+              await run([], async () => {
+                await delay(10000);
+              });
+            },
+          });
+
+          assertFalse(signal.aborted);
+        });
+        it("should throws if ticks longer than `maxTicks`", async () => {
+          await testStream({
+            maxTicks: 5,
+            fn({ abort }) {
+              assertThrows(
+                () => {
+                  abort("------");
+                },
+                MaxTicksExceededError,
+                "Ticks exceeded",
+              );
+            },
+          });
+        });
+      });
+      describe("(..., error)", () => {
+        it("should be DOMException for abort reason if not specified", async () => {
+          await testStream(async ({ abort, run }) => {
+            const signal = abort("---!");
+
+            await run([]);
+
+            assert(signal.aborted);
+            assertInstanceOf(signal.reason, DOMException);
+          });
+        });
+        it("should be DOMException for abort reason if specify undefined", async () => {
+          await testStream(async ({ abort, run }) => {
+            const signal = abort("---!", undefined);
+
+            await run([]);
+
+            assert(signal.aborted);
+            assertInstanceOf(signal.reason, DOMException);
+          });
+        });
+        for (const reason of ABORT_REASON_CASES) {
+          if (reason === undefined) continue;
+          it(`should be possible to specify ${toPrint(reason)} for abort`, async () => {
+            await testStream(async ({ abort, run }) => {
+              const signal = abort("----!", reason);
+
+              await run([]);
+
+              assert(signal.aborted);
+              assertEquals(signal.reason, reason);
+            });
+          });
+        }
+      });
+    });
     describe(".assertReadable", () => {
       it("should rejects if called within `run`", async () => {
         await testStream(async ({ assertReadable, run }) => {

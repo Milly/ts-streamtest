@@ -78,6 +78,11 @@ export interface TestStreamFn {
 /** Represents the helper functions provided in the `testStream` block. */
 export interface TestStreamHelper {
   /**
+   * Creates an AbortSignal that aborts at the specified timing.
+   */
+  abort: TestStreamHelperAbort;
+
+  /**
    * Asserts that the readable stream matches the specified `series`.
    */
   assertReadable: TestStreamHelperAssertReadable;
@@ -91,6 +96,27 @@ export interface TestStreamHelper {
    * Process the test streams inside the `run` block.
    */
   run: TestStreamHelperRun;
+}
+
+/** Represents the `abort` function of the test stream helper. */
+export interface TestStreamHelperAbort {
+  /**
+   * Creates an AbortSignal that aborts at the specified timing.
+   *
+   * The following characters are available in the `series`:
+   *
+   * - `\x20`  : Space is ignored. Used to align columns.
+   * - `-`     : Advance 1 tick.
+   * - `!`     : Abort.
+   *
+   * Example: `abort("  -----!", "cancelled")`
+   *
+   * @param series The string representing the timing of abort.
+   * @param [reason] The value that replaces the abort reason. Defaults to `DOMException`.
+   * @returns An AbortSignal that aborts at the specified timing.
+   * @throws {SyntaxError} `series` is invalid format.
+   */
+  (series: string, reason?: unknown): AbortSignal;
 }
 
 /** Represents the `assertReadable` function of the test stream helper. */
@@ -158,7 +184,6 @@ export interface TestStreamHelperReadable {
    * @param [error] The value that replaces the reason when the stream aborts.
    * @returns The created ReadableStream.
    * @throws {SyntaxError} `series` is invalid format.
-   * @throws {OperationNotPermittedError} Called concurrently or outside `testStream`.
    */
   (
     series: string,
@@ -350,6 +375,23 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     return createStream(frames);
   };
 
+  /** `abort` helper. */
+  const createSignal: TestStreamHelperAbort = (
+    series: string,
+    reason?: unknown,
+  ): AbortSignal => {
+    if (/[^-! ]/.test(series)) {
+      throw new SyntaxError(`Invalid character: "${series}"`);
+    }
+    series = series.replace("!", "#");
+    const frames = parseSeries(series, {}, reason);
+    const abortController = new AbortController();
+    createStream(frames)
+      .pipeTo(new WritableStream())
+      .catch((reason) => abortController.abort(reason));
+    return abortController.signal;
+  };
+
   /** `run` helper. */
   const processStreams: TestStreamHelperRun = async <
     T extends readonly ReadableStream[],
@@ -412,6 +454,16 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   const helper: TestStreamHelper = {
+    abort(...args: unknown[]): AbortSignal {
+      logger().debug(`abort(): call`, { testStreamId, args });
+      try {
+        assertNotDisposed();
+        return createSignal(...(args as Parameters<TestStreamHelperAbort>));
+      } catch (e: unknown) {
+        fixStackTrace(e as Error, helper.abort);
+        throw e;
+      }
+    },
     async assertReadable(...args: unknown[]): Promise<void> {
       logger().debug(`assertReadable(): call`, { testStreamId, args });
       try {
