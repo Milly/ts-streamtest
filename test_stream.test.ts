@@ -1412,6 +1412,23 @@ describe("testStream", () => {
           });
         }
       });
+      for (const reason of ABORT_REASON_CASES) {
+        it(`should matchs if the readable stream is cancelled with ${toPrint(reason)}`, async () => {
+          await testStream(async ({ readable, abort, run, assertReadable }) => {
+            const actual = readable("--a---b---|");
+            const expected = "       --a--!";
+            const signal = abort("   -----!");
+
+            await run([actual], (actual) => {
+              signal.addEventListener("abort", () => {
+                actual.cancel(reason);
+              }, { once: true });
+            });
+
+            await assertReadable(actual, expected, {}, reason);
+          });
+        });
+      }
     });
     describe(".run", () => {
       it("should call the specified function once", async () => {
