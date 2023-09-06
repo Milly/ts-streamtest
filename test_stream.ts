@@ -654,17 +654,27 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
 }
 
 function createControllReadable() {
-  const abortController = new AbortController();
+  let onCancelCallbacks: ((reason: unknown) => void)[] = [];
+  const onCancel = (callback: (reason: unknown) => void): void => {
+    onCancelCallbacks.push(callback);
+  };
   let controller!: ReadableStreamDefaultController;
   const readable = new ReadableStream({
     start(con) {
       controller = con;
     },
     cancel(reason) {
-      abortController.abort(reason);
+      for (const callback of onCancelCallbacks) {
+        callback(reason);
+      }
     },
   });
-  return { readable, controller, cancelSignal: abortController.signal };
+  const dispose = () => {
+    // deno-lint-ignore no-explicit-any
+    onCancelCallbacks = null as any;
+    controller.error("disposed");
+  };
+  return { readable, controller, onCancel, dispose };
 }
 
 function createRunnerFromFrames(
@@ -682,7 +692,12 @@ function createRunnerFromFrames(
     throw new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } });
   }
 
-  const { readable, controller, cancelSignal } = createControllReadable();
+  const {
+    readable,
+    controller,
+    onCancel,
+    dispose: disposeReadable,
+  } = createControllReadable();
   const log: Frame[] = [];
   let closed = false;
   let done = false;
@@ -698,10 +713,10 @@ function createRunnerFromFrames(
     });
   };
 
-  cancelSignal.addEventListener("abort", () => {
+  onCancel((reason) => {
     if (!done) {
       closed = done = true;
-      addLog({ type: "cancel", value: cancelSignal.reason });
+      addLog({ type: "cancel", value: reason });
     }
   });
 
@@ -763,6 +778,7 @@ function createRunnerFromFrames(
       controller.close();
       closed = true;
     }
+    disposeReadable();
   };
 
   return { id: streamId, readable, tick, postTick, correctLog, dispose };
