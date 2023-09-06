@@ -13,6 +13,7 @@ import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
   OperationNotPermittedError,
+  TestStreamError,
 } from "./errors/mod.ts";
 
 function logger() {
@@ -413,30 +414,49 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const helper: TestStreamHelper = {
     async assertReadable(...args: unknown[]): Promise<void> {
       logger().debug(`assertReadable(): call`, { testStreamId, args });
-      assertNotDisposed();
-      lock();
       try {
-        await assertReadable(
-          ...(args as Parameters<TestStreamHelperAssertReadable>),
-        );
-      } finally {
-        unlock();
+        assertNotDisposed();
+        lock();
+        try {
+          await assertReadable(
+            ...(args as Parameters<TestStreamHelperAssertReadable>),
+          );
+        } finally {
+          unlock();
+        }
+      } catch (e: unknown) {
+        fixStackTrace(e as Error, helper.assertReadable);
+        throw e;
       }
     },
     // deno-lint-ignore no-explicit-any
     readable(...args: unknown[]): ReadableStream<any> {
       logger().debug(`readable(): call`, { testStreamId, args });
-      assertNotDisposed();
-      return createReadable(...(args as Parameters<TestStreamHelperReadable>));
+      try {
+        assertNotDisposed();
+        return createReadable(
+          ...(args as Parameters<TestStreamHelperReadable>),
+        );
+      } catch (e: unknown) {
+        fixStackTrace(e as Error, helper.readable);
+        throw e;
+      }
     },
     async run(...args: unknown[]): Promise<void> {
       logger().debug(`run(): call`, { testStreamId, args });
-      assertNotDisposed();
-      lock();
       try {
-        await processStreams(...(args as Parameters<TestStreamHelperRun>));
-      } finally {
-        unlock();
+        assertNotDisposed();
+        lock();
+        try {
+          await processStreams(...(args as Parameters<TestStreamHelperRun>));
+        } finally {
+          unlock();
+        }
+      } catch (e: unknown) {
+        if (e instanceof TestStreamError) {
+          fixStackTrace(e, helper.run);
+        }
+        throw e;
       }
     },
   };
@@ -811,5 +831,15 @@ function assertFramesEquals(
     throw new AssertionError(
       (e as Error).message.replace(/^.*?\0/, "Stream not matched"),
     );
+  }
+}
+
+const fixedErrors = new WeakSet();
+// deno-lint-ignore no-explicit-any
+function fixStackTrace(e: object, ignoreFn: (...args: any[]) => any): void {
+  if (!fixedErrors.has(e)) {
+    // See: https://v8.dev/docs/stack-trace-api
+    Error.captureStackTrace?.(e, ignoreFn);
+    fixedErrors.add(e);
   }
 }
