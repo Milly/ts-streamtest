@@ -269,33 +269,27 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   const readableRunnerMap = new Map<ReadableStream, Runner>();
   let disposed = false;
-  /** `undefined` if unlocked, otherwise `Promise` that resolves on unlocked. */
-  let lockPromise: Promise<unknown> | undefined;
+  let locked = false;
 
-  // deno-lint-ignore no-explicit-any
-  const lock = <F extends (...args: any[]) => unknown>(
-    fn: F,
-    args: Parameters<F>,
-  ): ReturnType<F> => {
-    if (lockPromise) {
+  const assertNotDisposed = () => {
+    if (disposed) {
+      throw new OperationNotPermittedError(
+        "Helpers does not allow call outside `testStream`",
+      );
+    }
+  };
+
+  const lock = (): void => {
+    if (locked) {
       throw new OperationNotPermittedError(
         "Helpers does not allow concurrent call",
       );
     }
-    lockPromise = Promise.resolve();
-    try {
-      let result = fn(...args);
-      if (result instanceof Promise) {
-        result = result.finally(() => lockPromise = undefined);
-        lockPromise = (result as Promise<unknown>).then(NOOP, NOOP);
-      } else {
-        lockPromise = undefined;
-      }
-      return result as ReturnType<F>;
-    } catch (e: unknown) {
-      lockPromise = undefined;
-      throw e;
-    }
+    locked = true;
+  };
+
+  const unlock = (): void => {
+    locked = false;
   };
 
   /** Returns a readable for the specified stream arguments. */
@@ -397,7 +391,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   /** `assertReadable` helper. */
-  const assertReadable: TestStreamHelperAssertReadable = (
+  const assertReadable: TestStreamHelperAssertReadable = async (
     actual: ReadableStream,
     ...streamArgs: CreateStreamArgs
   ): Promise<void> => {
@@ -409,42 +403,42 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
     const expectedFrames = parseSeries(series, values, error);
     const expected = createStream(expectedFrames);
+    await processStreams([actual, expected]);
 
-    return processStreams([actual, expected])
-      .then(() => {
-        const actualLog = getRunner(actual).correctLog();
-        const expectedLog = getRunner(expected).correctLog();
-        assertFramesEquals(actualLog, expectedLog);
-      });
-  };
-
-  // deno-lint-ignore no-explicit-any
-  const helperMethod = <T extends (...args: any[]) => unknown>(
-    fn: T,
-    name: string,
-    opts?: { allowConcurrent?: true },
-  ): T => {
-    const { allowConcurrent = false } = opts ?? {};
-    const obj = {
-      [name](...args: Parameters<T>) {
-        logger().debug(`${name}(): call`, { testStreamId, args });
-        if (disposed) {
-          throw new OperationNotPermittedError(
-            "Helpers does not allow call outside `testStream`",
-          );
-        }
-        return allowConcurrent ? fn(...args) : lock(fn, args);
-      },
-    };
-    return obj[name] as T;
+    const actualLog = getRunner(actual).correctLog();
+    const expectedLog = getRunner(expected).correctLog();
+    assertFramesEquals(actualLog, expectedLog);
   };
 
   const helper: TestStreamHelper = {
-    assertReadable: helperMethod(assertReadable, "assertReadable"),
-    readable: helperMethod(createReadable, "readable", {
-      allowConcurrent: true,
-    }),
-    run: helperMethod(processStreams, "run"),
+    async assertReadable(...args: unknown[]): Promise<void> {
+      logger().debug(`assertReadable(): call`, { testStreamId, args });
+      assertNotDisposed();
+      lock();
+      try {
+        await assertReadable(
+          ...(args as Parameters<TestStreamHelperAssertReadable>),
+        );
+      } finally {
+        unlock();
+      }
+    },
+    // deno-lint-ignore no-explicit-any
+    readable(...args: unknown[]): ReadableStream<any> {
+      logger().debug(`readable(): call`, { testStreamId, args });
+      assertNotDisposed();
+      return createReadable(...(args as Parameters<TestStreamHelperReadable>));
+    },
+    async run(...args: unknown[]): Promise<void> {
+      logger().debug(`run(): call`, { testStreamId, args });
+      assertNotDisposed();
+      lock();
+      try {
+        await processStreams(...(args as Parameters<TestStreamHelperRun>));
+      } finally {
+        unlock();
+      }
+    },
   };
 
   const executeFn = async () => {
@@ -454,7 +448,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       // Sets the disposed flag immediately after the fn finishes.
       disposed = true;
     }
-    if (lockPromise) {
+    if (locked) {
       throw new LeakingAsyncOpsError(
         "Helper function is still running, but `testStream` execution block ends." +
           " This is often caused by calling helper functions without using `await`.",

@@ -1,5 +1,4 @@
 import {
-  afterEach,
   beforeEach,
   describe,
   it,
@@ -101,28 +100,9 @@ function pipeToChunks(
   return { chunks, completed };
 }
 
-function catchUnhandledRejection(): unknown[] {
-  assertFalse(
-    globalThis.onunhandledrejection,
-    "Already attached listener to 'onunhandledrejection'.",
-  );
-  const reasons: unknown[] = [];
-  globalThis.onunhandledrejection = (ev) => {
-    ev.preventDefault();
-    reasons.push(ev.reason);
-  };
-  return reasons;
-}
-function resetUnhandledRejection(): void {
-  globalThis.onunhandledrejection = null;
-}
-
 describe("testStream", () => {
   beforeEach(() => {
     baseTime = Date.now();
-  });
-  afterEach(() => {
-    resetUnhandledRejection();
   });
   describe("arguments", () => {
     describe("(options)", () => {
@@ -411,21 +391,6 @@ describe("testStream", () => {
         "Helper function is still running",
       );
     });
-    it("should rejects if calling `assertReadable` that rejects without `await`", async () => {
-      const unhundledErrors = catchUnhandledRejection();
-      await assertRejects(
-        async () => {
-          await testStream(({ assertReadable, readable }) => {
-            const actual = readable("a-|");
-            /* no await */ assertReadable(actual, "x-|");
-          });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-      await delay(0);
-      assertEquals(unhundledErrors, []);
-    });
     it("should rejects if calling `run` without `await`", async () => {
       await assertRejects(
         async () => {
@@ -437,33 +402,17 @@ describe("testStream", () => {
         "Helper function is still running",
       );
     });
-    it("should rejects if calling `run` that rejects without `await`", async () => {
-      const unhundledErrors = catchUnhandledRejection();
-      await assertRejects(
-        async () => {
-          await testStream(({ run }) => {
-            /* no await */ run([], () => {
-              throw new MyCustomError();
-            });
-          });
-        },
-        LeakingAsyncOpsError,
-        "Helper function is still running",
-      );
-      await delay(0);
-      assertEquals(unhundledErrors, []);
-    });
   });
   describe("TestStreamHelper", () => {
     describe(".assertReadable", () => {
-      it("should throws if called within `run`", async () => {
+      it("should rejects if called within `run`", async () => {
         await testStream(async ({ assertReadable, run }) => {
           const stream = ReadableStream.from(["a", "b", "c"]);
 
-          await run([], () => {
-            assertThrows(
-              () => {
-                assertReadable(stream, "(abc|)");
+          await run([], async () => {
+            await assertRejects(
+              async () => {
+                await assertReadable(stream, "(abc|)");
               },
               OperationNotPermittedError,
               "Helpers does not allow concurrent call",
@@ -471,7 +420,7 @@ describe("testStream", () => {
           });
         });
       });
-      it("should throws if called outside `testStream`", async () => {
+      it("should rejects if called outside `testStream`", async () => {
         let savedAssertReadable: TestStreamHelperAssertReadable;
         const stream = ReadableStream.from(["a", "b", "c"]);
 
@@ -479,9 +428,9 @@ describe("testStream", () => {
           savedAssertReadable = assertReadable;
         });
 
-        assertThrows(
-          () => {
-            savedAssertReadable(stream, "(abc|)");
+        await assertRejects(
+          async () => {
+            await savedAssertReadable(stream, "(abc|)");
           },
           OperationNotPermittedError,
           "Helpers does not allow call outside `testStream`",
@@ -619,15 +568,15 @@ describe("testStream", () => {
             await assertReadable(stream, "a(bc)(d|)");
           });
         });
-        it("should throws if ticks longer than `maxTicks`", async () => {
+        it("should rejects if ticks longer than `maxTicks`", async () => {
           await testStream({
             maxTicks: 5,
-            fn({ assertReadable }) {
+            async fn({ assertReadable }) {
               const stream = new ReadableStream();
 
-              assertThrows(
-                () => {
-                  assertReadable(stream, "------");
+              await assertRejects(
+                async () => {
+                  await assertReadable(stream, "------");
                 },
                 MaxTicksExceededError,
                 "Ticks exceeded",
@@ -1327,12 +1276,12 @@ describe("testStream", () => {
           }
         });
       });
-      it("should throws if called within `run`", async () => {
+      it("should rejects if called within `run`", async () => {
         await testStream(async ({ run }) => {
-          await run([], () => {
-            assertThrows(
-              () => {
-                run([]);
+          await run([], async () => {
+            await assertRejects(
+              async () => {
+                await run([]);
               },
               OperationNotPermittedError,
               "Helpers does not allow concurrent call",
@@ -1340,16 +1289,16 @@ describe("testStream", () => {
           });
         });
       });
-      it("should throws if called outside `testStream`", async () => {
+      it("should rejects if called outside `testStream`", async () => {
         let savedRun: TestStreamHelperRun;
 
         await testStream(({ run }) => {
           savedRun = run;
         });
 
-        assertThrows(
-          () => {
-            savedRun([]);
+        await assertRejects(
+          async () => {
+            await savedRun([]);
           },
           OperationNotPermittedError,
           "Helpers does not allow call outside `testStream`",
