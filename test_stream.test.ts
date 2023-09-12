@@ -27,6 +27,7 @@ import {
   OperationNotPermittedError,
 } from "./errors/mod.ts";
 import {
+  setLogger,
   testStream,
   type TestStreamHelper,
   TestStreamHelperAbort,
@@ -59,6 +60,7 @@ try {
         },
       },
     });
+    setLogger(log.getLogger("testStream"));
   }
 } catch (e: unknown) {
   if (!(e instanceof Deno.errors.PermissionDenied)) {

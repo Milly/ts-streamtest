@@ -8,7 +8,7 @@
 import { assertEquals } from "https://deno.land/std@0.199.0/assert/assert_equals.ts";
 import { AssertionError } from "https://deno.land/std@0.199.0/assert/assertion_error.ts";
 import { FakeTime } from "https://deno.land/std@0.199.0/testing/time.ts";
-import { getLogger } from "https://deno.land/std@0.199.0/log/mod.ts";
+import type { Logger } from "https://deno.land/std@0.199.0/log/logger.ts";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -16,8 +16,10 @@ import {
   TestStreamError,
 } from "./errors/mod.ts";
 
-function logger() {
-  return getLogger("testStream");
+let logger: Logger | undefined;
+
+export function setLogger(newLogger: Logger): void {
+  logger = newLogger;
 }
 
 const DEFAULT_TICK_TIME = 100;
@@ -282,7 +284,7 @@ type MutableTuple<T extends readonly unknown[]> =
  */
 export function testStream(...args: TestStreamArgs): Promise<void> {
   const testStreamId = ++currentTestStreamId;
-  logger().debug("testStream(): start", { testStreamId: currentTestStreamId });
+  logger?.debug("testStream(): start", { testStreamId: currentTestStreamId });
 
   const { fn, tickTime, maxTicks } = testStreamDefinition(args);
 
@@ -341,7 +343,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     while (!disposed) {
       let runners: Runner[] = [];
 
-      logger().debug("processAllTicks(): tick", { testStreamId });
+      logger?.debug("processAllTicks(): tick", { testStreamId });
       for (let index = 0; index < readableRunnerMap.size;) {
         runners = [...readableRunnerMap.values()];
         for (; index < runners.length; ++index) {
@@ -353,7 +355,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
         if (disposed) return;
       }
 
-      logger().debug("processAllTicks(): postTick", { testStreamId });
+      logger?.debug("processAllTicks(): postTick", { testStreamId });
       const results = runners.map((runner) => runner.postTick());
       await time.tickAsync(tickTime);
 
@@ -366,7 +368,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const createReadable: TestStreamHelperReadable = (
     ...streamArgs: CreateStreamArgs
   ): ReadableStream => {
-    logger().debug("createReadable(): call", {
+    logger?.debug("createReadable(): call", {
       testStreamId,
       streamId: nextStreamId,
       streamArgs,
@@ -399,7 +401,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     streams: T,
     fn?: TestStreamHelperRunFn<T>,
   ): Promise<void> => {
-    logger().debug("processStreams(): start", { testStreamId });
+    logger?.debug("processStreams(): start", { testStreamId });
 
     // Register runners.
     const wrappedStreams = streams.map((s) =>
@@ -410,13 +412,13 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     if (fn) {
       let fnContinue = true;
       const fnRunner = async () => {
-        logger().debug("processStreams(): fn: start", { testStreamId });
+        logger?.debug("processStreams(): fn: start", { testStreamId });
         try {
           await fn(...wrappedStreams);
         } finally {
           fnContinue = false;
         }
-        logger().debug("processStreams(): fn: end", { testStreamId });
+        logger?.debug("processStreams(): fn: end", { testStreamId });
       };
 
       const ticksRunner = async () => {
@@ -430,7 +432,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       await processAllTicks();
     }
 
-    logger().debug("processStreams(): end", { testStreamId });
+    logger?.debug("processStreams(): end", { testStreamId });
   };
 
   /** `assertReadable` helper. */
@@ -455,7 +457,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   const helper: TestStreamHelper = {
     abort(...args: unknown[]): AbortSignal {
-      logger().debug(`abort(): call`, { testStreamId, args });
+      logger?.debug(`abort(): call`, { testStreamId, args });
       try {
         assertNotDisposed();
         return createSignal(...(args as Parameters<TestStreamHelperAbort>));
@@ -465,7 +467,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       }
     },
     async assertReadable(...args: unknown[]): Promise<void> {
-      logger().debug(`assertReadable(): call`, { testStreamId, args });
+      logger?.debug(`assertReadable(): call`, { testStreamId, args });
       try {
         assertNotDisposed();
         lock();
@@ -483,7 +485,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     },
     // deno-lint-ignore no-explicit-any
     readable(...args: unknown[]): ReadableStream<any> {
-      logger().debug(`readable(): call`, { testStreamId, args });
+      logger?.debug(`readable(): call`, { testStreamId, args });
       try {
         assertNotDisposed();
         return createReadable(
@@ -495,7 +497,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       }
     },
     async run(...args: unknown[]): Promise<void> {
-      logger().debug(`run(): call`, { testStreamId, args });
+      logger?.debug(`run(): call`, { testStreamId, args });
       try {
         assertNotDisposed();
         lock();
@@ -542,7 +544,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       // This block must be separate Promise from the dispose block.
       // Ensures that all resources have been released when testStream settles.
       testStreamLocked = false;
-      logger().debug("testStream(): end", { testStreamId });
+      logger?.debug("testStream(): end", { testStreamId });
     });
 }
 
@@ -682,7 +684,7 @@ function createRunnerFromFrames(
   maxTicks: number,
 ): Runner {
   const streamId = nextStreamId++;
-  logger().debug("createRunnerFromFrames(): call", {
+  logger?.debug("createRunnerFromFrames(): call", {
     testStreamId: currentTestStreamId,
     streamId,
     frames,
@@ -706,7 +708,7 @@ function createRunnerFromFrames(
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger().debug("createRunnerFromFrames(): add", {
+    logger?.debug("createRunnerFromFrames(): add", {
       testStreamId: currentTestStreamId,
       streamId,
       frame,
@@ -761,7 +763,7 @@ function createRunnerFromFrames(
     if (!closed && (!frame || frame.type === "tick") && tickCount < maxTicks) {
       addLog({ type: "tick" });
       if (++tickCount >= maxTicks) {
-        logger().debug("createRunnerFromFrames(): exceeded", {
+        logger?.debug("createRunnerFromFrames(): exceeded", {
           testStreamId: currentTestStreamId,
           streamId,
         });
@@ -789,7 +791,7 @@ function createRunnerFromStream<T>(
   maxTicks: number,
 ): Runner<T> {
   const streamId = nextStreamId++;
-  logger().debug("createRunnerFromStream(): call", {
+  logger?.debug("createRunnerFromStream(): call", {
     testStreamId: currentTestStreamId,
     streamId,
   });
@@ -801,7 +803,7 @@ function createRunnerFromStream<T>(
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger().debug("createRunnerFromStream(): add", {
+    logger?.debug("createRunnerFromStream(): add", {
       testStreamId: currentTestStreamId,
       streamId,
       frame,
@@ -834,7 +836,7 @@ function createRunnerFromStream<T>(
         }
       }).finally(() => {
         reader.releaseLock();
-        logger().debug("reader.releaseLock");
+        logger?.debug("reader.releaseLock");
       });
     },
     cancel(reason) {
@@ -850,7 +852,7 @@ function createRunnerFromStream<T>(
     if (done) return false;
     addLog({ type: "tick" });
     if (++tickCount >= maxTicks) {
-      logger().debug("createRunnerFromStream(): exceeded", {
+      logger?.debug("createRunnerFromStream(): exceeded", {
         testStreamId: currentTestStreamId,
         streamId,
       });
