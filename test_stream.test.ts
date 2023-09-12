@@ -2,11 +2,11 @@ import {
   beforeEach,
   describe,
   it,
-} from "https://deno.land/std@0.199.0/testing/bdd.ts";
+} from "https://deno.land/std@0.201.0/testing/bdd.ts";
 import {
   assertSpyCalls,
   spy,
-} from "https://deno.land/std@0.199.0/testing/mock.ts";
+} from "https://deno.land/std@0.201.0/testing/mock.ts";
 import {
   assert,
   assertEquals,
@@ -18,9 +18,9 @@ import {
   assertRejects,
   assertStrictEquals,
   assertThrows,
-} from "https://deno.land/std@0.199.0/assert/mod.ts";
-import * as log from "https://deno.land/std@0.199.0/log/mod.ts";
-import { delay } from "https://deno.land/std@0.199.0/async/delay.ts";
+} from "https://deno.land/std@0.201.0/assert/mod.ts";
+import * as log from "https://deno.land/std@0.201.0/log/mod.ts";
+import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,

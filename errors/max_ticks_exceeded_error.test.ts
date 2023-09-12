@@ -1,8 +1,8 @@
-import { describe, it } from "https://deno.land/std@0.199.0/testing/bdd.ts";
+import { describe, it } from "https://deno.land/std@0.201.0/testing/bdd.ts";
 import {
   assertEquals,
   assertInstanceOf,
-} from "https://deno.land/std@0.199.0/assert/mod.ts";
+} from "https://deno.land/std@0.201.0/assert/mod.ts";
 import { MaxTicksExceededError } from "./max_ticks_exceeded_error.ts";
 
 describe("MaxTicksExceededError", () => {
