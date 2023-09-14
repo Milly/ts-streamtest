@@ -224,7 +224,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "maxTicks cannot be 0 or less",
+          "maxTicks should be 1 or more",
         );
       });
       it("should throws if a negative value is specified", () => {
@@ -236,7 +236,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "maxTicks cannot be 0 or less",
+          "maxTicks should be 1 or more",
         );
       });
       it("should throws if a float value is specified", () => {
@@ -257,15 +257,11 @@ describe("testStream", () => {
         await testStream({
           async fn({ readable, run }) {
             const stream = readable("----|");
-            let timer500Done = false;
-            let timer501Done = false;
-            setTimeout(() => timer500Done = true, 500);
-            setTimeout(() => timer501Done = true, 501);
+            const start = Date.now();
 
             await run([stream]);
 
-            assert(timer500Done);
-            assertFalse(timer501Done);
+            assertEquals(Date.now() - start, 100 * 5);
           },
         });
       });
@@ -274,34 +270,27 @@ describe("testStream", () => {
           tickTime: 250,
           async fn({ readable, run }) {
             const stream = readable("----|");
-            let timer1250Done = false;
-            let timer1251Done = false;
-            setTimeout(() => timer1250Done = true, 1250);
-            setTimeout(() => timer1251Done = true, 1251);
+            const start = Date.now();
 
             await run([stream]);
 
-            assert(timer1250Done);
-            assertFalse(timer1251Done);
+            assertEquals(Date.now() - start, 250 * 5);
           },
         });
       });
-      it("should not advances time if `0` is specified", async () => {
-        await testStream({
-          tickTime: 0,
-          async fn({ readable, run }) {
-            const stream = readable("----|");
-            let timer0Done = false;
-            let timer1Done = false;
-            setTimeout(() => timer0Done = true, 0);
-            setTimeout(() => timer1Done = true, 1);
-
-            await run([stream]);
-
-            assert(timer0Done, "Timer with `0` should be resolved");
-            assertFalse(timer1Done);
+      it("should throws if 0 is specified", () => {
+        assertThrows(
+          () => {
+            testStream({
+              tickTime: 0,
+              fn: async ({ run }) => {
+                await run([]);
+              },
+            });
           },
-        });
+          RangeError,
+          "tickTime should be 1 or more",
+        );
       });
       it("should throws if a negative value is specified", () => {
         assertThrows(
@@ -314,7 +303,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "tickTime cannot go backwards",
+          "tickTime should be 1 or more",
         );
       });
       it("should throws if a float value is specified", () => {
@@ -489,9 +478,9 @@ describe("testStream", () => {
             const signal = abort("   -   - -  !   ", "break");
 
             await run([], async () => {
-              await delay(299);
+              await delay(300 - 1);
               assertFalse(signal.aborted);
-              await delay(1);
+              await delay(2);
               assert(signal.aborted);
             });
           });
@@ -501,9 +490,9 @@ describe("testStream", () => {
             const signal = abort("-----!", "break");
 
             await run([], async () => {
-              await delay(499);
+              await delay(500 - 1);
               assertFalse(signal.aborted);
-              await delay(1);
+              await delay(2);
               assert(signal.aborted);
             });
           });
@@ -1223,13 +1212,22 @@ describe("testStream", () => {
 
             await run([], async () => {
               assertEquals(chunks, []);
-              await delay(1);
+              await delay(0);
               assertEquals(chunks, ["a"]);
-              await delay(100);
+
+              await delay(100 - 1);
+              assertEquals(chunks, ["a"]);
+              await delay(1);
               assertEquals(chunks, ["a", "b"]);
-              await delay(100);
+
+              await delay(100 - 1);
+              assertEquals(chunks, ["a", "b"]);
+              await delay(1);
               assertEquals(chunks, ["a", "b", "c"]);
-              await delay(100);
+
+              await delay(100 - 1);
+              assert(stream.locked, "Stream should not closed");
+              await delay(2);
               assertFalse(stream.locked, "Stream should closed");
             });
           });
@@ -1241,19 +1239,24 @@ describe("testStream", () => {
             const { chunks } = pipeToChunks(stream);
 
             await run([], async () => {
-              await delay(500);
+              await delay(500 - 1);
               assertEquals(chunks, []);
               await delay(1);
               assertEquals(chunks, ["a"]);
-              await delay(200);
+
+              await delay(300 - 1);
               assertEquals(chunks, ["a"]);
-              await delay(100);
+              await delay(1);
               assertEquals(chunks, ["a", "b"]);
-              await delay(100);
+
+              await delay(100 - 1);
+              assertEquals(chunks, ["a", "b"]);
+              await delay(1);
               assertEquals(chunks, ["a", "b", "c"]);
-              await delay(100);
+
+              await delay(200 - 1);
               assert(stream.locked, "Stream should not closed");
-              await delay(100);
+              await delay(2);
               assertFalse(stream.locked, "Stream should closed");
             });
           });
@@ -1266,9 +1269,9 @@ describe("testStream", () => {
             stream.pipeTo(new WritableStream());
 
             await run([], async () => {
-              await delay(250);
+              await delay(300 - 1);
               assertEquals(stream.locked, true);
-              await delay(100);
+              await delay(2);
               assertEquals(stream.locked, false);
             });
 
@@ -1588,60 +1591,140 @@ describe("testStream", () => {
           assertEquals(chunks, ["a", "A!", "b", "B!", "c"]);
         });
       });
-      it("should fulfilled the long delay in `fn`", async () => {
+      it("should not advances time inside `fn` without delay", async () => {
         await testStream({
+          tickTime: 100,
           maxTicks: 50,
           async fn({ run }) {
-            await run([], async () => {
-              await delay(10000);
+            const start = Date.now();
+            const times: number[] = [];
+
+            await run([], () => {
+              times.push(Date.now() - start);
             });
+
+            assertEquals(times, [0]);
           },
         });
       });
-      it("should fulfilled multiple long delays in `fn`", async () => {
-        await testStream({
-          maxTicks: 50,
-          async fn({ run }) {
-            await run([], async () => {
-              await delay(10000);
-              await delay(10000);
-            });
-          },
+      it("should not rejects if called without await", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(({ run, readable }) => {
+          const stream = readable("a-|");
+
+          runPromise = run([stream]);
+        }).catch(() => {
+          // Ignore LeakingAsyncOpsError
         });
-      });
-      it("should not rejects if called without `await`", async () => {
-        let runPromise!: Promise<void>;
-        await testStream(({ run, readable }) => {
-          const actual = readable("a-|");
-          runPromise = run([actual]);
-        }).catch(() => {});
 
         // runPromise should not rejects.
         await runPromise;
       });
-      it("should not reject after tasks if called without `await`", async () => {
-        let runPromise!: Promise<void>;
-        await testStream(({ run, readable }) => {
-          const actual = readable("a-|");
-          runPromise = run([actual]);
-          // Returns a delay Promise directly, which avoids additional microtasks.
-          return delay(0);
-        }).catch(() => {});
+      for (
+        const [name, t] of [
+          ["0", 0],
+          ["less than `tickTime`", 42],
+          ["same as `tickTime`", 100],
+          ["a multiple of `tickTime`", 200],
+          ["not a multiple of `tickTime`", 563],
+          ["same as `tickTime * maxTicks`", 100 * 50],
+          ["more than `tickTime * maxTicks`", 100 * 50 + 398],
+        ] as const
+      ) {
+        it(`should advances time by delay inside \`fn\`: ${name}`, async () => {
+          await testStream({
+            tickTime: 100,
+            maxTicks: 50,
+            async fn({ run }) {
+              const start = Date.now();
+              const actual: number[] = [];
 
-        // runPromise should not rejects.
-        await runPromise;
-      });
-      it("should not reject after tasks and microtasks if called without `await`", async () => {
-        let runPromise!: Promise<void>;
-        await testStream(async ({ run, readable }) => {
-          const actual = readable("a-|");
-          runPromise = run([actual]);
-          await delay(0);
-        }).catch(() => {});
+              await run([], async () => {
+                await delay(t);
+                actual.push(Date.now() - start);
+              });
 
-        // runPromise should not rejects.
-        await runPromise;
-      });
+              assertEquals(actual, [t]);
+            },
+          });
+        });
+        it(`should advances time by setTimeout before \`fn\`: ${name}`, async () => {
+          await testStream({
+            tickTime: 100,
+            maxTicks: 50,
+            async fn({ run }) {
+              const start = Date.now();
+              const actual: number[] = [];
+
+              setTimeout(() => {
+                actual.push(Date.now() - start);
+              }, t);
+
+              await run([]);
+
+              assertEquals(actual, [t]);
+            },
+          });
+        });
+        it(`should not advances time by setTimeout after \`fn\`: ${name}`, async () => {
+          await testStream({
+            tickTime: 100,
+            maxTicks: 50,
+            async fn({ run }) {
+              const start = Date.now();
+              const actual: number[] = [];
+
+              await run([]);
+
+              setTimeout(() => {
+                actual.push(Date.now() - start);
+              }, t);
+
+              assertEquals(actual, []);
+            },
+          });
+        });
+        it(`should not rejects, if called without await and \`testStream\` block is disposed after delay: ${name}`, async () => {
+          let runPromise!: Promise<void>;
+          await testStream({
+            tickTime: 100,
+            maxTicks: 50,
+            async fn({ run, readable }) {
+              const stream = readable("--a--");
+
+              runPromise = run([stream]);
+
+              // Use await, which adds microtasks.
+              await delay(t);
+            },
+          }).catch(() => {
+            // Ignore LeakingAsyncOpsError
+          });
+
+          // runPromise should not rejects.
+          await runPromise;
+        });
+        it(`should not rejects, if called without await and \`testStream\` block is disposed after delay without microtasks: ${name}`, async () => {
+          let runPromise!: Promise<void>;
+          await testStream({
+            tickTime: 100,
+            maxTicks: 50,
+            fn({ run, readable }) {
+              const stream = readable("--a--");
+
+              runPromise = run([stream]);
+
+              // Returns a delay Promise directly, which avoids additional microtasks.
+              return delay(t);
+            },
+          }).catch(() => {
+            // Ignore LeakingAsyncOpsError
+          });
+
+          // runPromise should not rejects.
+          await runPromise;
+        });
+      }
     });
   });
 });

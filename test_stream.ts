@@ -67,6 +67,7 @@ export interface TestStreamDefinition {
 
   /**
    * The maximum number of ticks for test streams.
+   * It should be an integer greater than or equal to 1.
    * If the ticks exceed the specified number, the stream will be aborted.
    *
    * @default 50
@@ -75,6 +76,7 @@ export interface TestStreamDefinition {
 
   /**
    * The number of milliseconds to advance in one tick.
+   * It should be an integer greater than or equal to 1.
    *
    * @default 100
    */
@@ -266,7 +268,7 @@ type Runner<T = any> = {
   /**
    * Post-process after a tick.
    *
-   * @returns `true` if it continues, `false` if it done.
+   * @returns `true` if it done, `false` if it continues.
    */
   postTick(): boolean;
 
@@ -311,6 +313,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   testStreamLocked = true;
 
   const readableRunnerMap = new Map<ReadableStream, Runner>();
+  const activeRunners = new Set<Runner>();
   let disposed = false;
   let locked = false;
 
@@ -339,15 +342,17 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const createStream = (frames: Frame[]): ReadableStream => {
     const runner = createRunnerFromFrames(frames, maxTicks);
     readableRunnerMap.set(runner.readable, runner);
+    activeRunners.add(runner);
     return runner.readable;
   };
 
   /** Returns a runner for the specified stream. */
   const getRunner = <T>(stream: ReadableStream<T>): Runner<T> => {
-    const runner = readableRunnerMap.get(stream)!;
+    const runner = readableRunnerMap.get(stream);
     if (runner) return runner;
     const newRunner = createRunnerFromStream(stream, maxTicks);
     readableRunnerMap.set(stream, newRunner);
+    activeRunners.add(newRunner);
     return newRunner;
   };
 
@@ -355,27 +360,39 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const processAllTicks = async (): Promise<void> => {
     // This function runs in an asynchronous event loop.
     // Should always check whether the execution block has been disposed.
-    while (!disposed) {
-      let runners: Runner[] = [];
+    while (!disposed && activeRunners.size > 0) {
+      const processedRunners = new Set<Runner>();
 
       logger.debug("processAllTicks(): tick", { testStreamId });
-      for (let index = 0; index < readableRunnerMap.size;) {
-        runners = [...readableRunnerMap.values()];
-        for (; index < runners.length; ++index) {
-          runners[index].tick();
+      do {
+        for (const runner of activeRunners) {
+          if (!processedRunners.has(runner)) {
+            runner.tick();
+            processedRunners.add(runner);
+          }
         }
         await time.tickAsync(0);
         if (disposed) return;
         await time.runMicrotasks();
         if (disposed) return;
-      }
+      } while (processedRunners.size < activeRunners.size);
 
       logger.debug("processAllTicks(): postTick", { testStreamId });
-      const results = runners.map((runner) => runner.postTick());
-      await time.tickAsync(tickTime);
+      for (const runner of processedRunners) {
+        if (runner.postTick()) {
+          activeRunners.delete(runner);
+        }
+      }
 
-      // Exit if the continue flag is not included in results.
-      if (!results.includes(true)) break;
+      // Advances timer events in sequence until the next tick.
+      let untilNext = true;
+      fakeSetTimeout(() => untilNext = false, tickTime);
+      do {
+        // Do not use `nextAsync()` to avoid microtasks after `next`.
+        await time.runMicrotasks();
+        time.next();
+        if (disposed) return;
+      } while (untilNext);
     }
   };
 
@@ -423,29 +440,32 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       getRunner(s).readable
     ) as MutableTuple<T>;
 
-    await time.runMicrotasks();
-    if (fn) {
-      let fnContinue = true;
-      const fnRunner = async () => {
+    let fnContinue = false;
+    const fnRunner = fn
+      ? async () => {
         logger.debug("processStreams(): fn: start", { testStreamId });
+        fnContinue = true;
         try {
           await fn(...wrappedStreams);
         } finally {
           fnContinue = false;
         }
         logger.debug("processStreams(): fn: end", { testStreamId });
-      };
+      }
+      : NOOP;
 
-      const ticksRunner = async () => {
-        do {
-          await processAllTicks();
-        } while (!disposed && (await time.nextAsync() || fnContinue));
-      };
+    const ticksRunner = async () => {
+      do {
+        await processAllTicks();
+        if (disposed) return;
+        // Do not use `nextAsync()` to avoid microtasks after `next`.
+        await time.runMicrotasks();
+        if (disposed) return;
+      } while (time.next() || fnContinue || activeRunners.size > 0);
+    };
 
-      await Promise.all([fnRunner(), ticksRunner()]);
-    } else {
-      await processAllTicks();
-    }
+    await time.runMicrotasks();
+    await Promise.all([fnRunner(), ticksRunner()]);
 
     logger.debug("processStreams(): end", { testStreamId });
   };
@@ -546,6 +566,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   const time = new FakeTime();
+  const fakeSetTimeout = setTimeout;
   return executeFn()
     .finally(() => {
       // Dispose resources.
@@ -578,8 +599,8 @@ function testStreamDefinition(
     maxTicks = DEFAULT_MAX_TICKS,
   } = optOrFn;
 
-  if (tickTime < 0) {
-    throw new RangeError("tickTime cannot go backwards", {
+  if (tickTime <= 0) {
+    throw new RangeError("tickTime should be 1 or more", {
       cause: { tickTime },
     });
   }
@@ -590,7 +611,7 @@ function testStreamDefinition(
   }
 
   if (maxTicks <= 0) {
-    throw new RangeError("maxTicks cannot be 0 or less", {
+    throw new RangeError("maxTicks should be 1 or more", {
       cause: { maxTicks },
     });
   }
@@ -738,7 +759,7 @@ function createRunnerFromFrames(
   });
 
   const tick = (): void => {
-    if (done) return;
+    if (done || closed) return;
     while (++frameIndex < frames.length) {
       const { type, value } = frames[frameIndex];
       switch (type) {
@@ -770,12 +791,12 @@ function createRunnerFromFrames(
         }
       }
     }
-    done = true;
   };
 
   const postTick = (): boolean => {
+    if (done || closed) return true;
     const frame = frames[frameIndex];
-    if (!closed && (!frame || frame.type === "tick") && tickCount < maxTicks) {
+    if ((!frame || frame.type === "tick") && tickCount < maxTicks) {
       addLog({ type: "tick" });
       if (++tickCount >= maxTicks) {
         logger.debug("createRunnerFromFrames(): exceeded", {
@@ -785,7 +806,7 @@ function createRunnerFromFrames(
         done = true;
       }
     }
-    return !done;
+    return done || closed;
   };
 
   const correctLog = (): Frame[] => log;
@@ -864,7 +885,7 @@ function createRunnerFromStream<T>(
   const tick = NOOP;
 
   const postTick = (): boolean => {
-    if (done) return false;
+    if (done) return true;
     addLog({ type: "tick" });
     if (++tickCount >= maxTicks) {
       logger.debug("createRunnerFromStream(): exceeded", {
@@ -873,7 +894,7 @@ function createRunnerFromStream<T>(
       });
       done = true;
     }
-    return !done;
+    return done;
   };
 
   const correctLog = (): Frame[] => log;
