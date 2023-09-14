@@ -67,6 +67,7 @@ export interface TestStreamDefinition {
 
   /**
    * The maximum number of ticks for test streams.
+   * It should be an integer greater than or equal to 1.
    * If the ticks exceed the specified number, the stream will be aborted.
    *
    * @default 50
@@ -75,6 +76,7 @@ export interface TestStreamDefinition {
 
   /**
    * The number of milliseconds to advance in one tick.
+   * It should be an integer greater than or equal to 1.
    *
    * @default 100
    */
@@ -578,8 +580,8 @@ function testStreamDefinition(
     maxTicks = DEFAULT_MAX_TICKS,
   } = optOrFn;
 
-  if (tickTime < 0) {
-    throw new RangeError("tickTime cannot go backwards", {
+  if (tickTime <= 0) {
+    throw new RangeError("tickTime should be 1 or more", {
       cause: { tickTime },
     });
   }
@@ -590,7 +592,7 @@ function testStreamDefinition(
   }
 
   if (maxTicks <= 0) {
-    throw new RangeError("maxTicks cannot be 0 or less", {
+    throw new RangeError("maxTicks should be 1 or more", {
       cause: { maxTicks },
     });
   }

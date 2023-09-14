@@ -224,7 +224,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "maxTicks cannot be 0 or less",
+          "maxTicks should be 1 or more",
         );
       });
       it("should throws if a negative value is specified", () => {
@@ -236,7 +236,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "maxTicks cannot be 0 or less",
+          "maxTicks should be 1 or more",
         );
       });
       it("should throws if a float value is specified", () => {
@@ -257,15 +257,11 @@ describe("testStream", () => {
         await testStream({
           async fn({ readable, run }) {
             const stream = readable("----|");
-            let timer500Done = false;
-            let timer501Done = false;
-            setTimeout(() => timer500Done = true, 500);
-            setTimeout(() => timer501Done = true, 501);
+            const start = Date.now();
 
             await run([stream]);
 
-            assert(timer500Done);
-            assertFalse(timer501Done);
+            assertEquals(Date.now() - start, 100 * 5);
           },
         });
       });
@@ -274,34 +270,27 @@ describe("testStream", () => {
           tickTime: 250,
           async fn({ readable, run }) {
             const stream = readable("----|");
-            let timer1250Done = false;
-            let timer1251Done = false;
-            setTimeout(() => timer1250Done = true, 1250);
-            setTimeout(() => timer1251Done = true, 1251);
+            const start = Date.now();
 
             await run([stream]);
 
-            assert(timer1250Done);
-            assertFalse(timer1251Done);
+            assertEquals(Date.now() - start, 250 * 5);
           },
         });
       });
-      it("should not advances time if `0` is specified", async () => {
-        await testStream({
-          tickTime: 0,
-          async fn({ readable, run }) {
-            const stream = readable("----|");
-            let timer0Done = false;
-            let timer1Done = false;
-            setTimeout(() => timer0Done = true, 0);
-            setTimeout(() => timer1Done = true, 1);
-
-            await run([stream]);
-
-            assert(timer0Done, "Timer with `0` should be resolved");
-            assertFalse(timer1Done);
+      it("should throws if 0 is specified", () => {
+        assertThrows(
+          () => {
+            testStream({
+              tickTime: 0,
+              fn: async ({ run }) => {
+                await run([]);
+              },
+            });
           },
-        });
+          RangeError,
+          "tickTime should be 1 or more",
+        );
       });
       it("should throws if a negative value is specified", () => {
         assertThrows(
@@ -314,7 +303,7 @@ describe("testStream", () => {
             });
           },
           RangeError,
-          "tickTime cannot go backwards",
+          "tickTime should be 1 or more",
         );
       });
       it("should throws if a float value is specified", () => {
