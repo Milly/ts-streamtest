@@ -145,10 +145,10 @@ Deno.test("readable", async () => {
     const signal = abort("---!", abortReason);
 
     await run([], async () => {
-      await delay(299);
+      await delay(300 - 1);
       assertEquals(signal.aborted, false);
 
-      await delay(1);
+      await delay(2);
       assertEquals(signal.aborted, true);
       assertEquals(signal.reason, abortReason);
     });
