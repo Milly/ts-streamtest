@@ -341,8 +341,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     locked = false;
   };
 
-  /** Returns a readable for the specified stream arguments. */
-  const createStream = (frames: Frame[]): ReadableStream => {
+  /** Returns a readable for the specified frames. */
+  const createReadableFromFrame = (frames: Frame[]): ReadableStream => {
     const runner = createRunnerFromFrames(frames, maxTicks);
     readableRunnerMap.set(runner.readable, runner);
     activeRunners.add(runner);
@@ -403,13 +403,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   const createReadable: TestStreamHelperReadable = (
     ...streamArgs: CreateStreamArgs
   ): ReadableStream => {
-    logger.debug("createReadable(): call", {
-      testStreamId,
-      streamId: nextStreamId,
-      streamArgs,
-    });
-    const frames = parseSeries(...streamArgs);
-    return createStream(frames);
+    const frames = parseReadableSeries(...streamArgs);
+    return createReadableFromFrame(frames);
   };
 
   /** `abort` helper. */
@@ -417,13 +412,9 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     series: string,
     reason?: unknown,
   ): AbortSignal => {
-    if (/[^-! ]/.test(series)) {
-      throw new SyntaxError(`Invalid character: "${series}"`);
-    }
-    series = series.replace("!", "#");
-    const frames = parseSeries(series, {}, reason);
+    const frames = parseSignalSeries(series, reason);
     const abortController = new AbortController();
-    createStream(frames)
+    createReadableFromFrame(frames)
       .pipeTo(new WritableStream())
       .catch((reason) => abortController.abort(reason));
     return abortController.signal;
@@ -484,8 +475,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
     // Otherwise use the value of it. This is to allow undefined.
     const error = streamArgs.length < 3 ? ANY_VALUE : streamArgs[2];
 
-    const expectedFrames = parseSeries(series, values, error);
-    const expected = createStream(expectedFrames);
+    const expectedFrames = parseReadableSeries(series, values, error);
+    const expected = createReadableFromFrame(expectedFrames);
     await processStreams([actual, expected]);
 
     const actualLog = getRunner(actual).correctLog();
@@ -692,6 +683,18 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
   }
 
   return frames;
+}
+
+function parseReadableSeries(...streamArgs: CreateStreamArgs): Frame[] {
+  return parseSeries(...streamArgs);
+}
+
+function parseSignalSeries(series: string, reason?: unknown): Frame[] {
+  if (/[^-! ]/.test(series)) {
+    throw new SyntaxError(`Invalid character: "${series}"`);
+  }
+  series = series.replace("!", "#");
+  return parseSeries(series, {}, reason);
 }
 
 function createControllReadable() {
