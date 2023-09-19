@@ -126,9 +126,12 @@ export interface TestStreamHelperAbort {
    *
    * - `\x20`  : Space is ignored. Used to align columns.
    * - `-`     : Advance 1 tick.
-   * - `!`     : Abort.
+   * - `!`     : Abort the signal with the specified `error` as a reason.
    *
    * Example: `abort("  -----!", "cancelled")`
+   *
+   * 1. Waits 5 ticks.
+   * 2. Aborts the signal with the reason "cancelled".
    *
    * @param series The string representing the timing of abort.
    * @param [reason] The value that replaces the abort reason. Defaults to `DOMException`.
@@ -178,14 +181,14 @@ export interface TestStreamHelperReadable {
    * - `\x20`  : Space is ignored. Used to align columns.
    * - `-`     : Advance 1 tick.
    * - `|`     : Close the stream.
-   * - `!`     : Cancel the stream.
-   * - `#`     : Abort the stream.
+   * - `!`     : Cancel the stream with the specified `error` as a reason..
+   * - `#`     : Abort the stream with the specified `error` as a reason.
    * - `(...)` : Groups characters. It does not advance ticks inside.
    *             After closing `)`, advance 1 tick.
    * - Characters with keys in `values` will have their values enqueued to
-   *   the stream, and then advance 1 tick.
-   * - Other characters are enqueued into the stream as a single character,
-   *   and then advance 1 tick.
+   *   the stream. Then advance 1 tick.
+   * - Other characters are enqueued into the stream as a single character.
+   *   Then advance 1 tick.
    *
    * Example: `readable("  ---A--B(CD)--|", { A: "foo" })`
    *

@@ -16,7 +16,11 @@ Inspired by the test helpers in [RxJS](https://rxjs.dev/).
 A simple string `series` can be used to define values to be enqueued into a
 stream and events such as closes and errors.
 
-### Series format
+### Series for ReadableStream
+
+This can be used with the `readable` or `assertReadable` helpers.
+
+#### Series format
 
 The following characters are available in the `series`:
 
@@ -32,7 +36,7 @@ The following characters are available in the `series`:
 - Other characters are enqueued into the stream as a single character, and then
   advance 1 tick.
 
-#### Example for Series format
+#### Example
 
 - Series: `"  ---A--B(CD)--|"`
 - Values: `{ A: "foo" }`
@@ -44,6 +48,25 @@ The following characters are available in the `series`:
 5. "C" is enqueued, "D" is enqueued and waits 1 tick.
 6. Waits 2 ticks.
 7. Close the stream.
+
+### Series for AbortSignal
+
+This can be used with the `abort` helper.
+
+#### Series format
+
+The following characters are available in the `series`:
+
+- `\x20` : Space is ignored. Used to align columns.
+- `-` : Advance 1 tick.
+- `!` : Abort the signal.
+
+#### Example
+
+- Series: `"  ----- !  "`
+
+1. Waits 5 ticks.
+2. Aborts the signal.
 
 ## API Reference
 
@@ -113,7 +136,7 @@ Deno.test("assertReadable", async () => {
       C: "baz",
     } as const;
 
-    const stream = readable("--A--B--C--#", values, abortReason);
+    const source = readable("--A--B--C--#", values, abortReason);
     const expectedSeries = " --A--B--C--#";
     const expectedValues = {
       A: "FOO",
@@ -121,7 +144,7 @@ Deno.test("assertReadable", async () => {
       C: "BAZ",
     };
 
-    const actual = stream.pipeThrough(new UpperCase());
+    const actual = source.pipeThrough(new UpperCase());
 
     await assertReadable(actual, expectedSeries, expectedValues, abortReason);
   });
@@ -167,9 +190,9 @@ import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts
 
 Deno.test("run", async () => {
   await testStream(async ({ run, readable }) => {
-    const stream = readable("--a--b--c--|");
+    const source = readable("--a--b--c--|");
 
-    const actual = stream.pipeThrough(new UpperCase());
+    const actual = source.pipeThrough(new UpperCase());
 
     await run([actual], async (actual) => {
       const reader = actual.getReader();
