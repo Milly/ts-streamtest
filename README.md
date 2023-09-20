@@ -49,6 +49,32 @@ The following characters are available in the `series`:
 6. Waits 2 ticks.
 7. Close the stream.
 
+### Series for WritableStream
+
+This can be used with the `writable` helper.
+
+#### Series format
+
+The following characters are available in the `series`:
+
+- `\x20` : Space is ignored. Used to align columns.
+- `-` : Advance 1 tick.
+- `#` : Abort the stream.
+- `<` : Apply backpressure. Then advance 1 tick.
+- `>` : Release backpressure. Then advance 1 tick.
+
+#### Example
+
+- Series: `"  --- <-- >-- #  "`
+
+1. Waits 3 ticks.
+2. Apply backpressure. Flags the stream is not ready for writing.
+3. Waits 3 ticks.
+4. Release backpressure. Notify the data source that the stream is ready for
+   writing.
+5. Waits 3 ticks.
+6. Abort the stream.
+
 ### Series for AbortSignal
 
 This can be used with the `abort` helper.
@@ -115,6 +141,37 @@ Deno.test("readable", async () => {
     const errorStream = readable("    012#", undefined, abortReason);
 
     // Now you can use the `*Stream` in your test logic.
+  });
+});
+```
+
+### `writable` helper
+
+Creates a `WritableStream` with the specified `series`.
+
+```typescript
+import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+
+Deno.test("writable", async () => {
+  await testStream(async ({ writable, readable, run, assertReadable }) => {
+    const abortReason = new Error("abort");
+
+    const dest = writable("  -----<------------- >  --#", abortReason);
+    //     Backpressure range ____^^^^^^^^^^^^^^      ^
+    //                    Aborts the dest stream ____/
+
+    const source = readable("---a---b---c---d--- -  -----|");
+
+    const intermediate = source.pipeThrough(new TransformStream());
+    const expected = "       ---a---b-----------(cd)--!";
+    //       Apply backpressure ____^            ^^
+    // Release backpressure and emits "c", "d" _/
+
+    await run([intermediate], async (intermediate) => {
+      intermediate.pipeTo(dest).catch(() => {});
+    });
+
+    await assertReadable(intermediate, expected, {}, abortReason);
   });
 });
 ```

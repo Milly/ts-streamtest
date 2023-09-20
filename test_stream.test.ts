@@ -21,6 +21,7 @@ import {
 } from "https://deno.land/std@0.201.0/assert/mod.ts";
 import * as log from "https://deno.land/std@0.201.0/log/mod.ts";
 import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
+import { deferred } from "https://deno.land/std@0.201.0/async/deferred.ts";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -34,6 +35,7 @@ import {
   type TestStreamHelperAssertReadable,
   type TestStreamHelperReadable,
   type TestStreamHelperRun,
+  TestStreamHelperWritable,
 } from "./test_stream.ts";
 
 let baseTime = Date.now();
@@ -338,6 +340,7 @@ describe("testStream", () => {
           "assertReadable",
           "readable",
           "run",
+          "writable",
         ] satisfies (keyof TestStreamHelper)[],
       );
     });
@@ -434,6 +437,8 @@ describe("testStream", () => {
             "#", // `readable` error
             "a", // `readable` enqueue
             "()", // `readable` group
+            "<", // `writable` backpressure
+            ">", // `writable` backpressure
             "$", // reserved
             "%", // reserved
             "`", // reserved
@@ -603,6 +608,8 @@ describe("testStream", () => {
       describe("(actual, expectedSeries, ...)", () => {
         for (
           const expectedSeries of [
+            "<", // `writable` backpressure
+            ">", // `writable` backpressure
             "$", // reserved
             "%", // reserved
             "`", // reserved
@@ -1161,6 +1168,8 @@ describe("testStream", () => {
         });
         for (
           const series of [
+            "<", // `writable` backpressure
+            ">", // `writable` backpressure
             "$", // reserved
             "%", // reserved
             "`", // reserved
@@ -1609,8 +1618,8 @@ describe("testStream", () => {
       it("should pass the readables of the specified streams to `fn`", async () => {
         await testStream(async ({ readable, run }) => {
           const chunks: unknown[] = [];
-          const stream1 = readable("abc|");
-          const stream2 = readable("AB|");
+          const stream1 = readable("ab(cd|)");
+          const stream2 = readable("A(BC|)");
 
           const transformed2 = stream2.pipeThrough(
             new TransformStream({
@@ -1633,7 +1642,64 @@ describe("testStream", () => {
             },
           );
 
-          assertEquals(chunks, ["a", "A!", "b", "B!", "c"]);
+          assertEquals(chunks, ["a", "A!", "b", "B!", "C!", "c", "d"]);
+        });
+      });
+      it("should be pass throughs backpressure to the specified streams", async () => {
+        await testStream(async ({ writable, run, assertReadable }) => {
+          let chunkCount = 0;
+          let ready = deferred<void>();
+          const timer = setInterval(() => ready.resolve(), 200);
+          const stream = new ReadableStream<number>({
+            async pull(controller) {
+              await ready;
+              ready = deferred();
+              ++chunkCount;
+              controller.enqueue(chunkCount);
+            },
+            cancel(reason) {
+              clearInterval(timer);
+              ready.reject(reason);
+            },
+          }, { highWaterMark: 0 });
+
+          const values = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+          // stream:             --1-2-3-4-5-6-7-...
+          const expected = "     --1-2----34-5!";
+          const dest = writable("---<----->---#");
+
+          await run([stream], async (stream) => {
+            stream.pipeTo(dest).catch(() => {});
+
+            await delay(1);
+            assertEquals(chunkCount, 0);
+
+            await delay(200);
+            assertEquals(chunkCount, 1);
+
+            await delay(200);
+            assertEquals(chunkCount, 2);
+
+            await delay(200);
+            assertEquals(chunkCount, 2);
+
+            await delay(200);
+            assertEquals(chunkCount, 2);
+
+            await delay(100 - 2);
+            assertEquals(chunkCount, 2);
+
+            await delay(2);
+            assertEquals(chunkCount, 3);
+
+            await delay(100);
+            assertEquals(chunkCount, 4);
+
+            await delay(200);
+            assertEquals(chunkCount, 5);
+          });
+
+          await assertReadable(stream, expected, values);
         });
       });
       it("should not advances time inside `fn` without delay", async () => {
@@ -1770,6 +1836,487 @@ describe("testStream", () => {
           await runPromise;
         });
       }
+    });
+    describe(".writable", () => {
+      it("should returns a writable stream", async () => {
+        await testStream(({ writable }) => {
+          const stream = writable("-----");
+
+          assertInstanceOf(stream, WritableStream);
+        });
+      });
+      it("should returns a writable stream inside `run`", async () => {
+        await testStream(async ({ writable, run }) => {
+          const createStream = () => writable("---");
+
+          await run([], async () => {
+            await delay(200);
+            const stream = createStream();
+            assertInstanceOf(stream, WritableStream);
+          });
+        });
+      });
+      it("should returns a writable stream inside and outside `run`", async () => {
+        await testStream(async ({ writable, run }) => {
+          const createStream1 = () => writable("---");
+          const createStream2 = () => writable("----");
+          const createStream3 = () => writable("-----");
+
+          // stream1 created outside `run`
+          const stream1 = createStream1();
+
+          // stream3 created asynchronously outside `run`
+          let stream3;
+          delay(1300).then(() => {
+            stream3 = createStream3();
+          });
+
+          let stream2;
+          await run([], async () => {
+            // stream2 created asynchronously inside `run`
+            await delay(200);
+            stream2 = createStream2();
+          });
+
+          assertInstanceOf(stream1, WritableStream);
+          assertInstanceOf(stream2, WritableStream);
+          assertInstanceOf(stream3, WritableStream);
+        });
+      });
+      it("should throws if called outside `testStream`", async () => {
+        let savedWritable: TestStreamHelperWritable;
+
+        await testStream(({ writable }) => {
+          savedWritable = writable;
+        });
+
+        assertThrows(
+          () => {
+            savedWritable("---");
+          },
+          OperationNotPermittedError,
+          "Helpers does not allow call outside `testStream`",
+        );
+      });
+      describe("(series, ...)", () => {
+        it("should be possible to not specify", async () => {
+          await testStream(({ writable }) => {
+            const stream = writable();
+
+            assertInstanceOf(stream, WritableStream);
+          });
+        });
+        it("should be possible to specify an empty string", async () => {
+          await testStream(({ writable }) => {
+            const stream = writable("");
+
+            assertInstanceOf(stream, WritableStream);
+          });
+        });
+        for (
+          const series of [
+            "|", // `readable` close
+            "!", // `readable` cancel
+            "a", // `readable` enqueue
+            "()", // `readable` group
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
+          ]
+        ) {
+          it(`should throws if contains invalid character: ${toPrint(series)}`, async () => {
+            await testStream(({ writable }) => {
+              assertThrows(
+                () => {
+                  writable(series);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            "<<",
+            "<--<",
+            "<><---<",
+          ]
+        ) {
+          it(`should throws if backpressure already applied: ${toPrint(series)}`, async () => {
+            await testStream(({ writable }) => {
+              assertThrows(
+                () => {
+                  writable(series);
+                },
+                SyntaxError,
+                "Backpressure already applied",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            ">",
+            "-->",
+            "<>-<-->->",
+          ]
+        ) {
+          it(`should throws if backpressure already released: ${toPrint(series)}`, async () => {
+            await testStream(({ writable }) => {
+              assertThrows(
+                () => {
+                  writable(series);
+                },
+                SyntaxError,
+                "Backpressure already released",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            "--#-",
+            "--#<",
+          ]
+        ) {
+          it(`should throws if non-trailing error: ${toPrint(series)}`, async () => {
+            await testStream(({ writable }) => {
+              assertThrows(
+                () => {
+                  writable(series);
+                },
+                SyntaxError,
+                "Non-trailing close",
+              );
+            });
+          });
+        }
+        for (
+          const series of [
+            "#",
+            "---#",
+          ]
+        ) {
+          it(`should not throws if trailing error: ${toPrint(series)}`, async () => {
+            await testStream(({ writable }) => {
+              const stream = writable(series);
+
+              assertInstanceOf(stream, WritableStream);
+            });
+          });
+        }
+        it("should ignores ` `", async () => {
+          const IS_PENDING = {} as const;
+          await testStream(async ({ writable, run }) => {
+            const source = new ReadableStream();
+            const stream = writable("   -   - -  #   ", "error");
+
+            await run([source], async (source) => {
+              const p = source.pipeTo(stream);
+              p.catch(() => {});
+
+              await delay(300 - 1);
+              assertStrictEquals(
+                await Promise.race([p, Promise.resolve(IS_PENDING)]),
+                IS_PENDING,
+                "p should not fulfilled before 3 ticks",
+              );
+
+              await delay(2);
+              const reason = await assertRejects(
+                () => Promise.race([p, Promise.resolve(IS_PENDING)]),
+              );
+              assertEquals(reason, "error");
+            });
+          });
+        });
+        it("should advances one tick with `-`", async () => {
+          const IS_PENDING = {} as const;
+          await testStream(async ({ writable, run }) => {
+            const source = new ReadableStream();
+            const stream = writable("-----#", "error");
+
+            await run([source], async (source) => {
+              const p = source.pipeTo(stream);
+              p.catch(() => {});
+
+              await delay(500 - 1);
+              assertStrictEquals(
+                await Promise.race([p, Promise.resolve(IS_PENDING)]),
+                IS_PENDING,
+                "p should not fulfilled before 3 ticks",
+              );
+
+              await delay(2);
+              const reason = await assertRejects(
+                () => Promise.race([p, Promise.resolve(IS_PENDING)]),
+              );
+              assertEquals(reason, "error");
+            });
+          });
+        });
+        it("should not close the stream without `#`", async () => {
+          const IS_PENDING = {} as const;
+          let stream: WritableStream<string>;
+          let streamClosed: Promise<void>;
+
+          await testStream({
+            maxTicks: 10,
+            async fn({ writable, run }) {
+              const source = new ReadableStream();
+              stream = writable("---");
+
+              await run([source], (source) => {
+                streamClosed = source.pipeTo(stream);
+              });
+
+              assertEquals(stream.locked, true);
+              assertStrictEquals(
+                await Promise.race([streamClosed, IS_PENDING]),
+                IS_PENDING,
+                "streamClosed should not fulfilled",
+              );
+            },
+          });
+
+          assertEquals(stream!.locked, false);
+          const stramCloseReason = await assertRejects(
+            () => Promise.race([streamClosed, IS_PENDING]),
+          );
+          assertEquals(stramCloseReason, "testStream disposed");
+        });
+        it("should applies backpressure with `<`", async () => {
+          await testStream(async ({ writable, run }) => {
+            let chunkCount = 0;
+            let ready = deferred<void>();
+            const timer = setInterval(() => ready.resolve(), 200);
+            const source = new ReadableStream<number>({
+              async pull(controller) {
+                await ready;
+                ready = deferred();
+                ++chunkCount;
+                controller.enqueue(chunkCount);
+              },
+              cancel(reason) {
+                clearInterval(timer);
+                ready.reject(reason);
+              },
+            }, { highWaterMark: 0 });
+
+            // source:               --1-2-3-4-...
+            // expected:             --1-2----!
+            const stream = writable("---<-----#");
+
+            await run([], async () => {
+              source.pipeTo(stream).catch(() => {});
+
+              await delay(1);
+              assertEquals(chunkCount, 0);
+
+              await delay(200);
+              assertEquals(chunkCount, 1);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+            });
+          });
+        });
+        it("should release backpressure with `>`", async () => {
+          await testStream(async ({ writable, run }) => {
+            let chunkCount = 0;
+            let ready = deferred<void>();
+            const timer = setInterval(() => ready.resolve(), 200);
+            const source = new ReadableStream<number>({
+              async pull(controller) {
+                await ready;
+                ready = deferred();
+                ++chunkCount;
+                controller.enqueue(chunkCount);
+              },
+              cancel(reason) {
+                clearInterval(timer);
+                ready.reject(reason);
+              },
+            }, { highWaterMark: 0 });
+
+            // source:               --1-2-3-4-5-6-...
+            // expected:             --1-2----34-5!
+            const stream = writable("---<----->---#");
+
+            await run([], async () => {
+              source.pipeTo(stream).catch(() => {});
+
+              await delay(1);
+              assertEquals(chunkCount, 0);
+
+              await delay(200);
+              assertEquals(chunkCount, 1);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+
+              await delay(200);
+              assertEquals(chunkCount, 2);
+
+              await delay(100 - 2);
+              assertEquals(chunkCount, 2);
+
+              await delay(2);
+              assertEquals(chunkCount, 3);
+
+              await delay(100);
+              assertEquals(chunkCount, 4);
+
+              await delay(200);
+              assertEquals(chunkCount, 5);
+            });
+          });
+        });
+        it("should throws if ticks longer than `maxTicks`", async () => {
+          await testStream({
+            maxTicks: 5,
+            fn({ writable }) {
+              assertThrows(
+                () => {
+                  writable("------");
+                },
+                MaxTicksExceededError,
+                "Ticks exceeded",
+              );
+            },
+          });
+        });
+      });
+      describe("(..., error)", () => {
+        it("should be undefined for error reason if not specified", async () => {
+          await testStream(async ({ writable, run }) => {
+            const source = new ReadableStream();
+            const stream = writable("----#");
+
+            const p = source.pipeTo(stream);
+            p.catch(() => {});
+            await run([]);
+
+            const actual = await assertRejects(() => p);
+            assertStrictEquals(actual, undefined);
+          });
+        });
+        for (const reason of ABORT_REASON_CASES) {
+          it(`should be possible to specify for error: ${toPrint(reason)}`, async () => {
+            await testStream(async ({ writable, run }) => {
+              const source = new ReadableStream();
+              const stream = writable("----#", reason);
+
+              const p = source.pipeTo(stream);
+              p.catch(() => {});
+              await run([]);
+
+              const actual = await assertRejects(() => p);
+              assertStrictEquals(actual, reason);
+            });
+          });
+        }
+      });
+      it("should be able to write chunks from the source", async () => {
+        const IS_PENDING = {} as const;
+        await testStream(async ({ writable, run }) => {
+          const actual: string[] = [];
+          const sourceChunks = ["a", "b", "c"];
+          const source = new ReadableStream({
+            pull(controller) {
+              const chunk = sourceChunks.shift();
+              if (chunk) {
+                controller.enqueue(chunk);
+                actual.push(chunk);
+              } else {
+                controller.close();
+                actual.push("|");
+              }
+            },
+          }, { highWaterMark: 0 });
+
+          const stream = writable();
+
+          await run([], () => {
+            source.pipeTo(stream);
+          });
+
+          assertNotStrictEquals(
+            await Promise.race([stream.getWriter().closed, IS_PENDING]),
+            IS_PENDING,
+          );
+          assertEquals(actual, ["a", "b", "c", "|"]);
+        });
+      });
+      it("should closes if the source closed", async () => {
+        const IS_PENDING = {} as const;
+        await testStream({
+          tickTime: 100,
+          async fn({ writable, run }) {
+            const source = new ReadableStream({
+              start(controller) {
+                setTimeout(() => {
+                  controller.close();
+                }, 150);
+              },
+            });
+
+            const stream = writable();
+
+            await run([], async () => {
+              const start = Date.now();
+              await source.pipeTo(stream);
+              assertEquals(Date.now() - start, 150);
+            });
+
+            assertNotStrictEquals(
+              await Promise.race([stream.getWriter().closed, IS_PENDING]),
+              IS_PENDING,
+            );
+          },
+        });
+      });
+      it("should aborts if the source aborted", async () => {
+        const IS_PENDING = {} as const;
+        await testStream({
+          tickTime: 100,
+          async fn({ writable, run }) {
+            const source = new ReadableStream({
+              start(controller) {
+                setTimeout(() => {
+                  controller.error("abort");
+                }, 150);
+              },
+            });
+
+            const stream = writable();
+
+            await run([], async () => {
+              const start = Date.now();
+              await source.pipeTo(stream).catch(() => {});
+              assertEquals(Date.now() - start, 150);
+            });
+
+            const abortReason = await assertRejects(
+              async () => {
+                await Promise.race([stream.getWriter().closed, IS_PENDING]);
+              },
+            );
+            assertEquals(abortReason, "abort");
+          },
+        });
+      });
     });
   });
 });
