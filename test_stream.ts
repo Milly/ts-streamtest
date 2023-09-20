@@ -672,6 +672,10 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
         break;
       }
       default: {
+        // Symbols other than alphabets and numbers in ASCII are reserved.
+        if (/^[\0-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]$/.test(c)) {
+          throw new SyntaxError(`Invalid character: "${series}"`);
+        }
         const value = values[c] ?? (Object.hasOwn(values, c) ? values[c] : c);
         frames.push({ type: "enqueue", value });
         if (!group) {

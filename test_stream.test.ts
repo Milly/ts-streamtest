@@ -430,13 +430,17 @@ describe("testStream", () => {
         });
         for (
           const series of [
-            "()",
-            "|",
-            "#",
-            "a",
+            "|", // `readable` close
+            "#", // `readable` error
+            "a", // `readable` enqueue
+            "()", // `readable` group
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
           ]
         ) {
-          it(`should throws if specified invalid character: ${toPrint(series)}`, async () => {
+          it(`should throws if contains invalid character: ${toPrint(series)}`, async () => {
             await testStream(({ abort }) => {
               assertThrows(
                 () => {
@@ -597,6 +601,27 @@ describe("testStream", () => {
         );
       });
       describe("(actual, expectedSeries, ...)", () => {
+        for (
+          const expectedSeries of [
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
+          ]
+        ) {
+          it(`should rejects if \`expectedSeries\` contains reserved character: ${toPrint(expectedSeries)}`, async () => {
+            await testStream(async ({ assertReadable }) => {
+              const stream = new ReadableStream();
+              await assertRejects(
+                async () => {
+                  await assertReadable(stream, expectedSeries);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
         it("should not rejects if actual matches expectedSeries", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = ReadableStream.from(["a", "b", "c"]);
@@ -1117,6 +1142,26 @@ describe("testStream", () => {
             assertEquals(chunks, []);
           });
         });
+        for (
+          const series of [
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
+          ]
+        ) {
+          it(`should throws if contains reserved character: ${toPrint(series)}`, async () => {
+            await testStream(({ readable }) => {
+              assertThrows(
+                () => {
+                  readable(series);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
         for (
           const series of [
             "()",
