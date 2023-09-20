@@ -430,13 +430,17 @@ describe("testStream", () => {
         });
         for (
           const series of [
-            "()",
-            "|",
-            "#",
-            "a",
+            "|", // `readable` close
+            "#", // `readable` error
+            "a", // `readable` enqueue
+            "()", // `readable` group
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
           ]
         ) {
-          it(`should throws if specified invalid character: ${toPrint(series)}`, async () => {
+          it(`should throws if contains invalid character: ${toPrint(series)}`, async () => {
             await testStream(({ abort }) => {
               assertThrows(
                 () => {
@@ -597,6 +601,27 @@ describe("testStream", () => {
         );
       });
       describe("(actual, expectedSeries, ...)", () => {
+        for (
+          const expectedSeries of [
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
+          ]
+        ) {
+          it(`should rejects if \`expectedSeries\` contains reserved character: ${toPrint(expectedSeries)}`, async () => {
+            await testStream(async ({ assertReadable }) => {
+              const stream = new ReadableStream();
+              await assertRejects(
+                async () => {
+                  await assertReadable(stream, expectedSeries);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
         it("should not rejects if actual matches expectedSeries", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = ReadableStream.from(["a", "b", "c"]);
@@ -637,7 +662,7 @@ describe("testStream", () => {
             await assertReadable(stream, "     a  bc |  ");
           });
         });
-        it("should matchs `-` to one tick", async () => {
+        it("should matches `-` to one tick", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               async start(controller) {
@@ -655,14 +680,14 @@ describe("testStream", () => {
             await assertReadable(stream, "-----a--bc-|");
           });
         });
-        it("should matchs `|` to close the stream", async () => {
+        it("should matches `|` to close the stream", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = ReadableStream.from([]);
 
             await assertReadable(stream, "|");
           });
         });
-        it("should matchs unclosed stream without `|`", async () => {
+        it("should matches unclosed stream without `|`", async () => {
           await testStream({
             maxTicks: 5,
             async fn({ assertReadable }) {
@@ -672,7 +697,7 @@ describe("testStream", () => {
             },
           });
         });
-        it("should matchs `!` to cancel the stream", async () => {
+        it("should matches `!` to cancel the stream", async () => {
           await testStream(async ({ assertReadable, run }) => {
             const stream = new ReadableStream();
 
@@ -683,7 +708,7 @@ describe("testStream", () => {
             await assertReadable(stream, "!");
           });
         });
-        it("should matchs `#` to abort the stream", async () => {
+        it("should matches `#` to abort the stream", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               start(controller) {
@@ -694,7 +719,7 @@ describe("testStream", () => {
             await assertReadable(stream, "#");
           });
         });
-        it("should matchs any character enqueue and one tick to the stream", async () => {
+        it("should matches any character enqueue and one tick to the stream", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               async start(controller) {
@@ -711,7 +736,7 @@ describe("testStream", () => {
             await assertReadable(stream, "abc|");
           });
         });
-        it("should matchs the stream that do not advance ticks within `(...)` and advance one tick after `)`", async () => {
+        it("should matches the stream that do not advance ticks within `(...)` and advance one tick after `)`", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               async start(controller) {
@@ -787,7 +812,7 @@ describe("testStream", () => {
         });
       });
       describe("(..., expectedError)", () => {
-        it("should matchs any cancel value if not specified", async () => {
+        it("should matches any cancel value if not specified", async () => {
           await testStream(async ({ assertReadable, run }) => {
             const stream = new ReadableStream();
 
@@ -798,7 +823,7 @@ describe("testStream", () => {
             await assertReadable(stream, "!");
           });
         });
-        it("should matchs any error value if not specified", async () => {
+        it("should matches any error value if not specified", async () => {
           await testStream(async ({ assertReadable }) => {
             const stream = new ReadableStream({
               start(controller) {
@@ -810,7 +835,7 @@ describe("testStream", () => {
           });
         });
         for (const reason of ABORT_REASON_CASES) {
-          it(`should matches ${toPrint(reason)} for cancel`, async () => {
+          it(`should matches the stream cancelled: ${toPrint(reason)}`, async () => {
             await testStream(async ({ assertReadable, run }) => {
               const stream = new ReadableStream();
 
@@ -821,7 +846,7 @@ describe("testStream", () => {
               await assertReadable(stream, "!", undefined, reason);
             });
           });
-          it(`should matches ${toPrint(reason)} for error`, async () => {
+          it(`should matches the stream errored: ${toPrint(reason)}`, async () => {
             await testStream(async ({ assertReadable }) => {
               const stream = new ReadableStream({
                 start(controller) {
@@ -832,16 +857,33 @@ describe("testStream", () => {
               await assertReadable(stream, "#", undefined, reason);
             });
           });
+          it(`should matches the stream created by \`readable\` and cancelled: ${toPrint(reason)}`, async () => {
+            await testStream(
+              async ({ readable, abort, run, assertReadable }) => {
+                const actual = readable("--a---b---|");
+                const expected = "       --a--!";
+                const signal = abort("   -----!");
+
+                await run([actual], (actual) => {
+                  signal.addEventListener("abort", () => {
+                    actual.cancel(reason);
+                  }, { once: true });
+                });
+
+                await assertReadable(actual, expected, {}, reason);
+              },
+            );
+          });
         }
       });
-      it("should match the stream created by `readable`", async () => {
+      it("should matches the stream created by `readable`", async () => {
         await testStream(async ({ assertReadable, readable }) => {
           const stream = readable("abcd|");
 
           await assertReadable(stream, "abcd|");
         });
       });
-      it("should match the stream tansformed from `readable`", async () => {
+      it("should matches the stream tansformed from `readable`", async () => {
         await testStream(async ({ assertReadable, readable }) => {
           const stream = readable("abcd|");
 
@@ -861,7 +903,7 @@ describe("testStream", () => {
           });
         });
       });
-      it("should match the stream processed with `run`", async () => {
+      it("should matches the stream processed with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -872,7 +914,7 @@ describe("testStream", () => {
           await assertReadable(stream, "abcd|");
         });
       });
-      it("should match the stream aborted with `run`", async () => {
+      it("should matches the stream aborted with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -891,7 +933,7 @@ describe("testStream", () => {
           await assertReadable(stream, "ab(c!)", undefined, "terminate");
         });
       });
-      it("should match the stream asynchronously aborted with `run`", async () => {
+      it("should matches the stream asynchronously aborted with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -910,7 +952,7 @@ describe("testStream", () => {
           await assertReadable(stream, "abc!", undefined, "terminate");
         });
       });
-      it("should match the stream transformed from `readable` and processed with `run`", async () => {
+      it("should matches the stream transformed from `readable` and processed with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -934,7 +976,7 @@ describe("testStream", () => {
           });
         });
       });
-      it("should match the stream transformed from `readable` and aborted with `run`", async () => {
+      it("should matches the stream transformed from `readable` and aborted with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -965,7 +1007,7 @@ describe("testStream", () => {
           }, "terminate");
         });
       });
-      it("should match the stream transformed from `readable` and asynchronously aborted with `run`", async () => {
+      it("should matches the stream transformed from `readable` and asynchronously aborted with `run`", async () => {
         await testStream(async ({ assertReadable, readable, run }) => {
           const stream = readable("abcd|");
 
@@ -996,7 +1038,7 @@ describe("testStream", () => {
           }, "terminate");
         });
       });
-      it("should match the stream that uses timer", async () => {
+      it("should matches the stream that uses timer", async () => {
         await testStream(async ({ assertReadable }) => {
           const stream = new ReadableStream<string>({
             async start(controller) {
@@ -1009,7 +1051,7 @@ describe("testStream", () => {
           await assertReadable(stream, "A|");
         });
       });
-      it("should match the stream that uses await before timer", async () => {
+      it("should matches the stream that uses await before timer", async () => {
         await testStream(async ({ assertReadable }) => {
           const stream = new ReadableStream<string>({
             async start(controller) {
@@ -1023,7 +1065,7 @@ describe("testStream", () => {
           await assertReadable(stream, "A|");
         });
       });
-      it("should match the stream that uses `delay(0)` first", async () => {
+      it("should matches the stream that uses `delay(0)` first", async () => {
         await testStream(async ({ assertReadable }) => {
           const stream = new ReadableStream<string>({
             async start(controller) {
@@ -1117,6 +1159,26 @@ describe("testStream", () => {
             assertEquals(chunks, []);
           });
         });
+        for (
+          const series of [
+            "$", // reserved
+            "%", // reserved
+            "`", // reserved
+            "~", // reserved
+          ]
+        ) {
+          it(`should throws if contains reserved character: ${toPrint(series)}`, async () => {
+            await testStream(({ readable }) => {
+              assertThrows(
+                () => {
+                  readable(series);
+                },
+                SyntaxError,
+                "Invalid character",
+              );
+            });
+          });
+        }
         for (
           const series of [
             "()",
@@ -1392,7 +1454,7 @@ describe("testStream", () => {
           });
         });
         for (const reason of ABORT_REASON_CASES) {
-          it(`should be possible to specify ${toPrint(reason)} for cancel`, async () => {
+          it(`should be possible to specify for cancel: ${toPrint(reason)}`, async () => {
             await testStream(async ({ readable, assertReadable }) => {
               const stream = readable("a-bc!", undefined, reason);
 
@@ -1401,7 +1463,7 @@ describe("testStream", () => {
               await assertReadable(stream, "a-bc!", undefined, reason);
             });
           });
-          it(`should be possible to specify ${toPrint(reason)} for error`, async () => {
+          it(`should be possible to specify for error: ${toPrint(reason)}`, async () => {
             await testStream(async ({ readable, run }) => {
               const stream = readable("a-bc#", undefined, reason);
 
@@ -1417,23 +1479,6 @@ describe("testStream", () => {
           });
         }
       });
-      for (const reason of ABORT_REASON_CASES) {
-        it(`should matchs if the readable stream is cancelled with ${toPrint(reason)}`, async () => {
-          await testStream(async ({ readable, abort, run, assertReadable }) => {
-            const actual = readable("--a---b---|");
-            const expected = "       --a--!";
-            const signal = abort("   -----!");
-
-            await run([actual], (actual) => {
-              signal.addEventListener("abort", () => {
-                actual.cancel(reason);
-              }, { once: true });
-            });
-
-            await assertReadable(actual, expected, {}, reason);
-          });
-        });
-      }
     });
     describe(".run", () => {
       it("should call the specified function once", async () => {
