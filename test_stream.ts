@@ -7,6 +7,7 @@
 
 import { assertEquals } from "https://deno.land/std@0.201.0/assert/assert_equals.ts";
 import { AssertionError } from "https://deno.land/std@0.201.0/assert/assertion_error.ts";
+import { deferred } from "https://deno.land/std@0.201.0/async/deferred.ts";
 import { FakeTime } from "https://deno.land/std@0.201.0/testing/time.ts";
 import type { Logger } from "https://deno.land/std@0.201.0/log/logger.ts";
 import {
@@ -115,6 +116,11 @@ export interface TestStreamHelper {
    * Process the test streams inside the `run` block.
    */
   run: TestStreamHelperRun;
+
+  /**
+   * Creates a `WritableStream` with the specified `series`.
+   */
+  writable: TestStreamHelperWritable;
 }
 
 /** Represents the `abort` function of the test stream helper. */
@@ -235,6 +241,41 @@ export interface TestStreamHelperRun {
   ): Promise<void>;
 }
 
+/** Represents the `writable` function of the test stream helper. */
+export interface TestStreamHelperWritable {
+  /**
+   * Creates a `WritableStream` with the specified `series`.
+   *
+   * The following characters are available in the `series`:
+   *
+   * - `\x20`  : Space is ignored. Used to align columns.
+   * - `-`     : Advance 1 tick.
+   * - `#`     : Abort the stream with the specified `error` as a reason.
+   * - `<`     : Apply backpressure. Then advance 1 tick.
+   * - `>`     : Release backpressure. Then advance 1 tick.
+   *
+   * Example: `writable("  ---<-->--#", "error")`
+   *
+   * 1. Waits 3 ticks.
+   * 2. Apply backpressure. Flags the stream is not ready for writing.
+   * 3. Waits 3 ticks.
+   * 4. Release backpressure. Notify the data source that the stream is ready for writing.
+   * 5. Waits 3 ticks.
+   * 6. Abort the stream with "error".
+   *
+   * @template T The chunk type of the stream.
+   * @param series The string representing the progress of the WritableStream.
+   * @param [error] The value that replaces the reason when the stream aborts.
+   * @returns The created WritableStream.
+   * @throws {SyntaxError} `series` is invalid format.
+   */
+  // deno-lint-ignore no-explicit-any
+  <T = any>(
+    series?: string,
+    error?: unknown,
+  ): WritableStream<T>;
+}
+
 /** Represents the `run` block of the test stream helper. */
 export interface TestStreamHelperRunFn<
   T extends readonly [ReadableStream] | readonly ReadableStream[],
@@ -256,12 +297,16 @@ type Frame = {
   value?: unknown;
 };
 
-type FrameType = "tick" | "enqueue" | "close" | "cancel" | "error";
+type FrameType =
+  | "tick"
+  | "enqueue"
+  | "close"
+  | "cancel"
+  | "error"
+  | "backpressure";
 
-// deno-lint-ignore no-explicit-any
-type Runner<T = any> = {
+type Runner = {
   id: number;
-  readable: ReadableStream<T>;
 
   /**
    * Process one tick.
@@ -283,6 +328,16 @@ type Runner<T = any> = {
   correctLog(): readonly Frame[];
 
   dispose(): void;
+};
+
+// deno-lint-ignore no-explicit-any
+type ReadableRunner<T = any> = Runner & {
+  readable: ReadableStream<T>;
+};
+
+// deno-lint-ignore no-explicit-any
+type WritableRunner<T = any> = Runner & {
+  writable: WritableStream<T>;
 };
 
 type CreateStreamArgs = [
@@ -315,7 +370,10 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   }
   testStreamLocked = true;
 
-  const readableRunnerMap = new Map<ReadableStream, Runner>();
+  const streamRunnerMap = new Map<
+    ReadableStream | WritableStream,
+    ReadableRunner | WritableRunner
+  >();
   const activeRunners = new Set<Runner>();
   let disposed = false;
   let locked = false;
@@ -343,18 +401,26 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
   /** Returns a readable for the specified frames. */
   const createReadableFromFrame = (frames: Frame[]): ReadableStream => {
-    const runner = createRunnerFromFrames(frames, maxTicks);
-    readableRunnerMap.set(runner.readable, runner);
+    const runner = createReadableRunnerFromFrames(frames, maxTicks);
+    streamRunnerMap.set(runner.readable, runner);
     activeRunners.add(runner);
     return runner.readable;
   };
 
+  /** Returns a writable for the specified frames. */
+  const createWritableFromFrame = (frames: Frame[]): WritableStream => {
+    const runner = createWritableRunnerFromFrames(frames, maxTicks);
+    streamRunnerMap.set(runner.writable, runner);
+    activeRunners.add(runner);
+    return runner.writable;
+  };
+
   /** Returns a runner for the specified stream. */
-  const getRunner = <T>(stream: ReadableStream<T>): Runner<T> => {
-    const runner = readableRunnerMap.get(stream);
+  const getRunner = <T>(stream: ReadableStream<T>): ReadableRunner<T> => {
+    const runner = streamRunnerMap.get(stream) as ReadableRunner<T>;
     if (runner) return runner;
-    const newRunner = createRunnerFromStream(stream, maxTicks);
-    readableRunnerMap.set(stream, newRunner);
+    const newRunner = createReadableRunnerFromStream(stream, maxTicks);
+    streamRunnerMap.set(stream, newRunner);
     activeRunners.add(newRunner);
     return newRunner;
   };
@@ -405,6 +471,15 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   ): ReadableStream => {
     const frames = parseReadableSeries(...streamArgs);
     return createReadableFromFrame(frames);
+  };
+
+  /** `writable` helper. */
+  const createWritable: TestStreamHelperWritable = (
+    series = "",
+    error?: unknown,
+  ): WritableStream => {
+    const frames = parseWritableSeries(series, error);
+    return createWritableFromFrame(frames);
   };
 
   /** `abort` helper. */
@@ -477,7 +552,11 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
 
     const expectedFrames = parseReadableSeries(series, values, error);
     const expected = createReadableFromFrame(expectedFrames);
-    await processStreams([actual, expected]);
+    await processStreams([actual, expected], (actual, expected) => {
+      actual.pipeTo(new WritableStream()).catch(NOOP);
+      expected.pipeTo(new WritableStream()).catch(NOOP);
+    });
+    if (disposed) return;
 
     const actualLog = getRunner(actual).correctLog();
     const expectedLog = getRunner(expected).correctLog();
@@ -542,14 +621,29 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
         throw e;
       }
     },
+    // deno-lint-ignore no-explicit-any
+    writable(...args: unknown[]): WritableStream<any> {
+      logger.debug(`writable(): call`, { testStreamId, args });
+      try {
+        assertNotDisposed();
+        return createWritable(
+          ...(args as Parameters<TestStreamHelperWritable>),
+        );
+      } catch (e: unknown) {
+        fixStackTrace(e as Error, helper.writable);
+        throw e;
+      }
+    },
   };
 
   const executeFn = async () => {
+    logger.debug("testStream(): fn: start", { testStreamId });
     try {
       await fn(helper);
     } finally {
       // Sets the disposed flag immediately after the fn finishes.
       disposed = true;
+      logger.debug("testStream(): fn: end", { testStreamId, locked });
     }
     if (locked) {
       throw new LeakingAsyncOpsError(
@@ -564,7 +658,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   return executeFn()
     .finally(() => {
       // Dispose resources.
-      for (const runner of readableRunnerMap.values()) {
+      for (const runner of streamRunnerMap.values()) {
         runner.dispose();
       }
       time.restore();
@@ -638,6 +732,7 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
   const frames: Frame[] = [];
   const seriesChars = [...series];
   let group = false;
+  let backpressure = false;
 
   loop:
   for (let count = 0; count < seriesChars.length; ++count) {
@@ -671,6 +766,24 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
         frames.push({ type: "tick" });
         break;
       }
+      case "<": {
+        if (backpressure) {
+          throw new SyntaxError(`Backpressure already applied: ${series}`);
+        }
+        backpressure = true;
+        frames.push({ type: "backpressure", value: true });
+        frames.push({ type: "tick" });
+        break;
+      }
+      case ">": {
+        if (!backpressure) {
+          throw new SyntaxError(`Backpressure already released: ${series}`);
+        }
+        backpressure = false;
+        frames.push({ type: "backpressure", value: false });
+        frames.push({ type: "tick" });
+        break;
+      }
       default: {
         // Symbols other than alphabets and numbers in ASCII are reserved.
         if (/^[\0-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]$/.test(c)) {
@@ -690,7 +803,18 @@ function parseSeries(...streamArgs: CreateStreamArgs): Frame[] {
 }
 
 function parseReadableSeries(...streamArgs: CreateStreamArgs): Frame[] {
+  const [series] = streamArgs;
+  if (/[<>]/.test(series)) {
+    throw new SyntaxError(`Invalid character: "${series}"`);
+  }
   return parseSeries(...streamArgs);
+}
+
+function parseWritableSeries(series: string, error?: unknown): Frame[] {
+  if (/[^-#<> ]/.test(series)) {
+    throw new SyntaxError(`Invalid character: "${series}"`);
+  }
+  return parseSeries(series, {}, error);
 }
 
 function parseSignalSeries(series: string, reason?: unknown): Frame[] {
@@ -716,21 +840,21 @@ function createControllReadable() {
         callback(reason);
       }
     },
-  });
+  }, { highWaterMark: 0 });
   const dispose = () => {
+    controller?.error("ReadableStream disposed");
     // deno-lint-ignore no-explicit-any
-    onCancelCallbacks = null as any;
-    controller.error("disposed");
+    controller = onCancelCallbacks = null as any;
   };
   return { readable, controller, onCancel, dispose };
 }
 
-function createRunnerFromFrames(
+function createReadableRunnerFromFrames(
   frames: readonly Frame[],
   maxTicks: number,
-): Runner {
+): ReadableRunner {
   const streamId = nextStreamId++;
-  logger.debug("createRunnerFromFrames(): call", {
+  logger.debug("createReadableRunnerFromFrames(): call", {
     testStreamId: currentTestStreamId,
     streamId,
     frames,
@@ -740,12 +864,7 @@ function createRunnerFromFrames(
     throw new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } });
   }
 
-  const {
-    readable,
-    controller,
-    onCancel,
-    dispose: disposeReadable,
-  } = createControllReadable();
+  const readable = createControllReadable();
   const log: Frame[] = [];
   let closed = false;
   let done = false;
@@ -754,14 +873,14 @@ function createRunnerFromFrames(
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger.debug("createRunnerFromFrames(): add", {
+    logger.debug("createReadableRunnerFromFrames(): add", {
       testStreamId: currentTestStreamId,
       streamId,
       frame,
     });
   };
 
-  onCancel((reason) => {
+  readable.onCancel((reason) => {
     if (!done) {
       closed = done = true;
       addLog({ type: "cancel", value: reason });
@@ -775,25 +894,25 @@ function createRunnerFromFrames(
       switch (type) {
         case "enqueue": {
           addLog({ type, value });
-          controller.enqueue(value);
+          readable.controller.enqueue(value);
           break;
         }
         case "close": {
           closed = true;
           addLog({ type });
-          controller.close();
+          readable.controller.close();
           break;
         }
         case "cancel": {
           closed = true;
           addLog({ type, value });
-          controller.close();
+          readable.controller.close();
           break;
         }
         case "error": {
           closed = true;
           addLog({ type, value });
-          controller.error(value);
+          readable.controller.error(value);
           break;
         }
         case "tick": {
@@ -809,7 +928,7 @@ function createRunnerFromFrames(
     if ((!frame || frame.type === "tick") && tickCount < maxTicks) {
       addLog({ type: "tick" });
       if (++tickCount >= maxTicks) {
-        logger.debug("createRunnerFromFrames(): exceeded", {
+        logger.debug("createReadableRunnerFromFrames(): exceeded", {
           testStreamId: currentTestStreamId,
           streamId,
         });
@@ -823,21 +942,28 @@ function createRunnerFromFrames(
 
   const dispose = () => {
     if (!closed) {
-      controller.close();
       closed = true;
+      readable.controller.close();
     }
-    disposeReadable();
+    readable.dispose();
   };
 
-  return { id: streamId, readable, tick, postTick, correctLog, dispose };
+  return {
+    id: streamId,
+    readable: readable.readable,
+    tick,
+    postTick,
+    correctLog,
+    dispose,
+  };
 }
 
-function createRunnerFromStream<T>(
+function createReadableRunnerFromStream<T>(
   source: ReadableStream<T>,
   maxTicks: number,
-): Runner<T> {
+): ReadableRunner<T> {
   const streamId = nextStreamId++;
-  logger.debug("createRunnerFromStream(): call", {
+  logger.debug("createReadableRunnerFromStream(): call", {
     testStreamId: currentTestStreamId,
     streamId,
   });
@@ -846,50 +972,63 @@ function createRunnerFromStream<T>(
   let closed = false;
   let done = false;
   let tickCount = 0;
+  let reading = deferred<void>();
+  reading.resolve();
 
   const addLog = (frame: Frame) => {
     log.push(frame);
-    logger.debug("createRunnerFromStream(): add", {
+    logger.debug("createReadableRunnerFromStream(): add", {
       testStreamId: currentTestStreamId,
       streamId,
       frame,
     });
   };
 
-  const reader = source.getReader();
+  let readableController: ReadableStreamDefaultController;
   const readable = new ReadableStream<T>({
     start(controller) {
-      (async () => {
-        while (true) {
-          const res = await reader.read();
-          if (res.done) {
-            if (!done) {
-              closed = done = true;
-              addLog({ type: "close" });
-              controller.close();
-            }
-            break;
-          } else {
-            addLog({ type: "enqueue", value: res.value });
-            controller.enqueue(res.value);
-          }
+      readableController = controller;
+    },
+    async pull(controller) {
+      reading = deferred();
+      try {
+        const res = await reader.read();
+        if (!res.done) {
+          addLog({ type: "enqueue", value: res.value });
+          controller.enqueue(res.value);
         }
-      })().catch((e) => {
-        if (!done) {
-          closed = done = true;
-          addLog({ type: "error", value: e });
-          controller.error(e);
-        }
-      }).finally(() => {
-        reader.releaseLock();
-        logger.debug("reader.releaseLock");
-      });
+      } finally {
+        reading.resolve();
+      }
     },
     cancel(reason) {
-      closed = done = true;
-      addLog({ type: "cancel", value: reason });
-      return reader.cancel(reason);
+      if (!closed) {
+        closed = done = true;
+        addLog({ type: "cancel", value: reason });
+        return reader.cancel(reason);
+      }
     },
+  }, { highWaterMark: 0 });
+
+  let reader = source.getReader();
+  reader.closed.then(
+    async () => {
+      if (!closed) {
+        await reading;
+        closed = done = true;
+        addLog({ type: "close" });
+        readableController.close();
+      }
+    },
+    (reason) => {
+      if (!closed) {
+        closed = done = true;
+        addLog({ type: "error", value: reason });
+        readableController.error(reason);
+      }
+    },
+  ).finally(() => {
+    reader?.releaseLock();
   });
 
   const tick = NOOP;
@@ -898,7 +1037,7 @@ function createRunnerFromStream<T>(
     if (done) return true;
     addLog({ type: "tick" });
     if (++tickCount >= maxTicks) {
-      logger.debug("createRunnerFromStream(): exceeded", {
+      logger.debug("createReadableRunnerFromStream(): exceeded", {
         testStreamId: currentTestStreamId,
         streamId,
       });
@@ -911,11 +1050,140 @@ function createRunnerFromStream<T>(
 
   const dispose = () => {
     if (!closed) {
+      closed = done = true;
       reader.cancel("testStream disposed");
+      reader.releaseLock();
     }
+    // deno-lint-ignore no-explicit-any
+    readableController = reader = null as any;
   };
 
   return { id: streamId, readable, tick, postTick, correctLog, dispose };
+}
+
+function createWritableRunnerFromFrames(
+  frames: readonly Frame[],
+  maxTicks: number,
+): WritableRunner {
+  const streamId = nextStreamId++;
+  logger.debug("createWritableRunnerFromFrames(): call", {
+    testStreamId: currentTestStreamId,
+    streamId,
+    frames,
+  });
+
+  if (frames.filter((f) => f.type === "tick").length > maxTicks) {
+    throw new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } });
+  }
+
+  const log: Frame[] = [];
+  let closed = false;
+  let done = false;
+  let frameIndex = -1;
+  let tickCount = 0;
+  let ready = deferred<void>();
+  ready.resolve();
+
+  let writableController: WritableStreamDefaultController;
+  const writable = new WritableStream({
+    start(controller) {
+      writableController = controller;
+    },
+    write(value) {
+      logger.debug("createWritableRunnerFromFrames(): write", {
+        testStreamId: currentTestStreamId,
+        streamId,
+        ready: ready.state,
+      });
+      addLog({ type: "enqueue", value });
+      return ready;
+    },
+    close() {
+      closed = done = true;
+      addLog({ type: "close" });
+    },
+    abort(reason) {
+      closed = done = true;
+      addLog({ type: "error", value: reason });
+    },
+  }, { highWaterMark: 1 });
+
+  const addLog = (frame: Frame) => {
+    log.push(frame);
+    logger.debug("createWritableRunnerFromFrames(): add", {
+      testStreamId: currentTestStreamId,
+      streamId,
+      frame,
+    });
+  };
+
+  const tick = (): void => {
+    if (done || closed) return;
+    while (++frameIndex < frames.length) {
+      const { type, value } = frames[frameIndex];
+      switch (type) {
+        case "backpressure": {
+          logger.debug("createWritableRunnerFromFrames(): backpressure", {
+            testStreamId: currentTestStreamId,
+            streamId,
+            apply: value,
+          });
+          if (value) {
+            ready = deferred();
+          } else {
+            ready.resolve();
+          }
+          break;
+        }
+        case "error": {
+          closed = done = true;
+          addLog({ type, value });
+          ready.reject(value);
+          writableController.error(value);
+          break;
+        }
+        case "tick": {
+          return;
+        }
+      }
+    }
+  };
+
+  const postTick = (): boolean => {
+    if (done || closed) return true;
+    const frame = frames[frameIndex];
+    if ((!frame || frame.type === "tick") && tickCount < maxTicks) {
+      addLog({ type: "tick" });
+      if (++tickCount >= maxTicks) {
+        logger.debug("createWritableRunnerFromFrames(): exceeded", {
+          testStreamId: currentTestStreamId,
+          streamId,
+        });
+        done = true;
+      }
+    }
+    return done || closed;
+  };
+
+  const correctLog = (): Frame[] => log;
+
+  const dispose = () => {
+    if (!closed) {
+      closed = true;
+      writableController.error("testStream disposed");
+    }
+    // deno-lint-ignore no-explicit-any
+    writableController = null as any;
+  };
+
+  return {
+    id: streamId,
+    tick,
+    postTick,
+    correctLog,
+    dispose,
+    writable,
+  };
 }
 
 function assertFramesEquals(
