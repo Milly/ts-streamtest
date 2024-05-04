@@ -1,7 +1,7 @@
 {
-  "lock": false,
   "tasks": {
-    "cache": "deno cache **/*.ts",
+    "cache": "deno cache **/*.ts --lock",
+    "lock": "deno task -q cache --lock-write",
     "check": "deno lint && deno fmt --check && deno check **/*.ts",
     "coverage": "deno coverage .coverage",
     "test": "deno test --allow-net --allow-read --doc",
