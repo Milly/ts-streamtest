@@ -1,8 +1,5 @@
-import { describe, it } from "https://deno.land/std@0.201.0/testing/bdd.ts";
-import {
-  assertEquals,
-  assertInstanceOf,
-} from "https://deno.land/std@0.201.0/assert/mod.ts";
+import { describe, it } from "@std/testing/bdd";
+import { assertEquals, assertInstanceOf } from "@std/assert";
 import { OperationNotPermittedError } from "./operation_not_permitted_error.ts";
 
 describe("OperationNotPermittedError", () => {

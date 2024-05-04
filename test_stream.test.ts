@@ -1,12 +1,5 @@
-import {
-  beforeEach,
-  describe,
-  it,
-} from "https://deno.land/std@0.201.0/testing/bdd.ts";
-import {
-  assertSpyCalls,
-  spy,
-} from "https://deno.land/std@0.201.0/testing/mock.ts";
+import { beforeEach, describe, it } from "@std/testing/bdd";
+import { assertSpyCalls, spy } from "@std/testing/mock";
 import {
   assert,
   assertEquals,
@@ -18,9 +11,9 @@ import {
   assertRejects,
   assertStrictEquals,
   assertThrows,
-} from "https://deno.land/std@0.201.0/assert/mod.ts";
-import * as log from "https://deno.land/std@0.201.0/log/mod.ts";
-import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
+} from "@std/assert";
+import { ConsoleHandler, getLogger, setup } from "@std/log";
+import { delay } from "@std/async/delay";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -40,9 +33,9 @@ import {
 let baseTime = Date.now();
 try {
   if (Deno.env.has("TESTLOG")) {
-    log.setup({
+    setup({
       handlers: {
-        console: new log.handlers.ConsoleHandler("DEBUG", {
+        console: new ConsoleHandler("DEBUG", {
           formatter({ datetime, levelName, msg, args }) {
             return [
               ((datetime.getTime() - baseTime) / 1000).toFixed(3),
@@ -61,7 +54,7 @@ try {
         },
       },
     });
-    setLogger(log.getLogger("testStream"));
+    setLogger(getLogger("testStream"));
   }
 } catch (e: unknown) {
   if (!(e instanceof Deno.errors.PermissionDenied)) {

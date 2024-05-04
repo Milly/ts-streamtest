@@ -213,9 +213,9 @@ Deno.test("assertReadable", async () => {
 Creates a `AbortSignal` with the specified `series`.
 
 ```typescript
-import { assertEquals } from "https://deno.land/std/assert/assert_equals.ts";
+import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
 import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
-import { delay } from "https://deno.land/std/async/delay.ts";
+import { delay } from "jsr:@std/async@0.224.0/delay";
 
 Deno.test("readable", async () => {
   await testStream(async ({ abort, run }) => {
@@ -241,7 +241,7 @@ Deno.test("readable", async () => {
 Process the test streams inside the `run` block.
 
 ```typescript
-import { assertEquals } from "https://deno.land/std/assert/assert_equals.ts";
+import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
 import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
 import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts";
 

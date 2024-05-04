@@ -1,4 +1,4 @@
-import { describe, it } from "https://deno.land/std@0.201.0/testing/bdd.ts";
+import { describe, it } from "@std/testing/bdd";
 import { testStream } from "../test_stream.ts";
 import { UpperCase } from "./upper_case.ts";
 

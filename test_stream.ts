@@ -5,10 +5,10 @@
  * @module
  */
 
-import { assertEquals } from "https://deno.land/std@0.201.0/assert/assert_equals.ts";
-import { AssertionError } from "https://deno.land/std@0.201.0/assert/assertion_error.ts";
-import { FakeTime } from "https://deno.land/std@0.201.0/testing/time.ts";
-import type { Logger } from "https://deno.land/std@0.201.0/log/logger.ts";
+import { assertEquals } from "@std/assert/assert-equals";
+import { AssertionError } from "@std/assert/assertion-error";
+import { FakeTime } from "@std/testing/time";
+import type { Logger } from "@std/log";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -22,16 +22,12 @@ const DEFAULT_MAX_TICKS = 50;
 const ANY_VALUE = Object.freeze(new (class AnyValue {})());
 const NOOP = () => {};
 
-type LogMethods = "debug" | "info" | "warning" | "error" | "critical";
+type LogMethods = "debug";
 type SimpleLogger = { [K in LogMethods]: Logger[K] };
 
 let logger: SimpleLogger;
 setLogger({
   debug: NOOP,
-  info: NOOP,
-  warning: NOOP,
-  error: NOOP,
-  critical: NOOP,
 });
 
 /**
