@@ -27,10 +27,10 @@ jobs:
           deno-version: "${{ matrix.deno-version }}"
       - uses: actions/cache@v4
         with:
-          key: deno-${{ hashFiles('**/*') }}
+          key: deno-${{ hashFiles('deno.lock') }}
           restore-keys: deno-
           path: |
-            /home/runner/.cache/deno/deps/https/deno.land
+            /home/runner/.cache/deno
       - name: Check
         run: deno task check
 
@@ -49,10 +49,10 @@ jobs:
           deno-version: "${{ matrix.deno-version }}"
       - uses: actions/cache@v4
         with:
-          key: deno-${{ hashFiles('**/*') }}
+          key: deno-${{ hashFiles('deno.lock') }}
           restore-keys: deno-
           path: |
-            /home/runner/.cache/deno/deps/https/deno.land
+            /home/runner/.cache/deno
       - name: Cache
         run: deno task cache
       - name: Test
