@@ -18,6 +18,9 @@ describe("LeakingAsyncOpsError", () => {
 
     assertEquals(error.name, "LeakingAsyncOpsError");
   });
+  it("should have a static name", () => {
+    assertEquals(LeakingAsyncOpsError.name, "LeakingAsyncOpsError");
+  });
   it("should have a message", () => {
     const error = new LeakingAsyncOpsError();
 

@@ -18,6 +18,9 @@ describe("MaxTicksExceededError", () => {
 
     assertEquals(error.name, "MaxTicksExceededError");
   });
+  it("should have a static name", () => {
+    assertEquals(MaxTicksExceededError.name, "MaxTicksExceededError");
+  });
   it("should have a message", () => {
     const error = new MaxTicksExceededError();
 

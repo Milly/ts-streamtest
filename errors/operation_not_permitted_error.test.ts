@@ -18,6 +18,9 @@ describe("OperationNotPermittedError", () => {
 
     assertEquals(error.name, "OperationNotPermittedError");
   });
+  it("should have a static name", () => {
+    assertEquals(OperationNotPermittedError.name, "OperationNotPermittedError");
+  });
   it("should have a message", () => {
     const error = new OperationNotPermittedError();
 

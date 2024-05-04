@@ -18,6 +18,9 @@ describe("TestStreamError", () => {
 
     assertEquals(error.name, "TestStreamError");
   });
+  it("should have a static name", () => {
+    assertEquals(TestStreamError.name, "TestStreamError");
+  });
   it("should have a message", () => {
     const error = new TestStreamError();
 
