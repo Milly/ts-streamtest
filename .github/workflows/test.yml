@@ -8,6 +8,9 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     strategy:
@@ -15,14 +18,14 @@ jobs:
         runner:
           - ubuntu-latest
         deno-version:
-          - "1.x"
+          - "v1.x"
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v1
         with:
           deno-version: "${{ matrix.deno-version }}"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           key: deno-${{ hashFiles('**/*') }}
           restore-keys: deno-
@@ -37,14 +40,14 @@ jobs:
         runner:
           - ubuntu-latest
         deno-version:
-          - "1.x"
+          - "v1.x"
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v1
         with:
           deno-version: "${{ matrix.deno-version }}"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           key: deno-${{ hashFiles('**/*') }}
           restore-keys: deno-
@@ -56,6 +59,6 @@ jobs:
         run: deno task testcov
       - name: Coverage
         run: deno task coverage --lcov --output=./lcov
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           files: ./lcov
