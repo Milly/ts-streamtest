@@ -40,6 +40,12 @@ async function* findCodeBlocks(file: string) {
   }
 }
 
-function evalCode(code: string): Promise<unknown> {
-  return import(`data:application/typescript,${encodeURIComponent(code)}`);
+async function evalCode(code: string): Promise<unknown> {
+  const blob = new Blob([code], { type: "text/typescript" });
+  const url = URL.createObjectURL(blob);
+  try {
+    return await import(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

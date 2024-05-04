@@ -23,11 +23,11 @@ import {
   setLogger,
   testStream,
   type TestStreamHelper,
-  TestStreamHelperAbort,
+  type TestStreamHelperAbort,
   type TestStreamHelperAssertReadable,
   type TestStreamHelperReadable,
   type TestStreamHelperRun,
-  TestStreamHelperWritable,
+  type TestStreamHelperWritable,
 } from "./test_stream.ts";
 
 let baseTime = Date.now();

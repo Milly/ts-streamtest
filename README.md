@@ -1,13 +1,13 @@
 # streamtest
 
 [![license:MIT](https://img.shields.io/github/license/Milly/deno-streamtest)](LICENSE)
+[![jsr](https://jsr.io/badges/@milly/streamtest)](https://jsr.io/@milly/streamtest)
 [![deno land](http://img.shields.io/badge/available%20on-deno.land/x-lightgrey.svg?logo=deno)](https://deno.land/x/streamtest)
 [![Test](https://github.com/Milly/deno-streamtest/workflows/Test/badge.svg)](https://github.com/Milly/deno-streamtest/actions?query=workflow%3ATest)
 [![codecov](https://codecov.io/gh/Milly/deno-streamtest/branch/master/graph/badge.svg?token=81L4DWDPIJ)](https://codecov.io/gh/Milly/deno-streamtest)
 
-**streamtest** is a library for testing streams in [Deno](https://deno.land/).
-Provides helper functions that make it easier to test streams with various
-scenarios and assertions.
+**streamtest** is a library for testing streams. Provides helper functions that
+make it easier to test streams with various scenarios and assertions.
 
 Inspired by the test helpers in [RxJS](https://rxjs.dev/).
 
@@ -103,10 +103,7 @@ specified for `testStream`, which has helper functions available only within
 that function.
 
 ```typescript
-import {
-  testStream,
-  type TestStreamHelper,
-} from "https://deno.land/x/streamtest/test_stream.ts";
+import { testStream, type TestStreamHelper } from "jsr:@milly/streamtest";
 
 Deno.test("MyTransformer", async () => {
   await testStream(async (helper: TestStreamHelper) => {
@@ -120,7 +117,7 @@ Deno.test("MyTransformer", async () => {
 Creates a `ReadableStream` with the specified `series`.
 
 ```typescript
-import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { testStream } from "jsr:@milly/streamtest";
 
 Deno.test("readable", async () => {
   await testStream(async ({ readable }) => {
@@ -150,7 +147,7 @@ Deno.test("readable", async () => {
 Creates a `WritableStream` with the specified `series`.
 
 ```typescript
-import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { testStream } from "jsr:@milly/streamtest";
 
 Deno.test("writable", async () => {
   await testStream(async ({ writable, readable, run, assertReadable }) => {
@@ -181,8 +178,8 @@ Deno.test("writable", async () => {
 Asserts that the readable stream matches the specified `series`.
 
 ```typescript
-import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
-import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts";
+import { testStream } from "jsr:@milly/streamtest";
+import { UpperCase } from "jsr:@milly/streamtest/examples/upper-case";
 
 Deno.test("assertReadable", async () => {
   await testStream(async ({ assertReadable, readable }) => {
@@ -214,7 +211,7 @@ Creates a `AbortSignal` with the specified `series`.
 
 ```typescript
 import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
-import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
+import { testStream } from "jsr:@milly/streamtest";
 import { delay } from "jsr:@std/async@0.224.0/delay";
 
 Deno.test("readable", async () => {
@@ -242,8 +239,8 @@ Process the test streams inside the `run` block.
 
 ```typescript
 import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
-import { testStream } from "https://deno.land/x/streamtest/test_stream.ts";
-import { UpperCase } from "https://deno.land/x/streamtest/examples/upper_case.ts";
+import { testStream } from "jsr:@milly/streamtest";
+import { UpperCase } from "jsr:@milly/streamtest/examples/upper-case";
 
 Deno.test("run", async () => {
   await testStream(async ({ run, readable }) => {
