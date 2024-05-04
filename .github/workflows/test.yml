@@ -56,7 +56,7 @@ jobs:
       - name: Cache
         run: deno task cache
       - name: Test
-        run: deno task testcov
+        run: deno task test:coverage
       - name: Coverage
         run: deno task coverage --lcov --output=./lcov
       - uses: codecov/codecov-action@v4

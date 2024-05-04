@@ -5,10 +5,11 @@
     "check": "deno lint && deno fmt --check && deno check **/*.ts",
     "coverage": "deno coverage .coverage",
     "test": "deno test --allow-net --allow-read --doc",
-    "testcov": "rm -rf .coverage && deno task test --coverage=.coverage",
-    "testlog": "TESTLOG=1 deno task test --allow-env",
-    "update": "deno run --allow-env --allow-read --allow-write=. --allow-run=git,deno --allow-net=deno.land,jsr.io,registry.npmjs.org jsr:@molt/cli ./*.ts",
-    "update:commit": "deno task -q update --commit --pre-commit=fmt,lint"
+    "test:coverage": "deno task test --coverage=.coverage",
+    "test:log": "TESTLOG=1 deno task test --allow-env",
+    "pre-commit": "deno fmt && deno task -q check && deno task -q test",
+    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=deno.land,jsr.io jsr:@molt/cli@0.18.1 deno.jsonc mod.ts --changelog --unstable-lock deno.lock",
+    "update:commit": "deno task -q update --commit --prefix 'build(deps):' --prefix-lock 'build(lock)'"
   },
   "imports": {
     "https://deno.land/x/streamtest/": "./"
