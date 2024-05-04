@@ -30,7 +30,7 @@ jobs:
           key: deno-${{ hashFiles('deno.lock') }}
           restore-keys: deno-
           path: |
-            /home/runner/.cache/deno/deps/https/deno.land
+            /home/runner/.cache/deno
       - name: Check
         run: deno task check
 
@@ -52,7 +52,7 @@ jobs:
           key: deno-${{ hashFiles('deno.lock') }}
           restore-keys: deno-
           path: |
-            /home/runner/.cache/deno/deps/https/deno.land
+            /home/runner/.cache/deno
       - name: Cache
         run: deno task cache
       - name: Test
