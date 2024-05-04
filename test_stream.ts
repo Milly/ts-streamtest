@@ -7,7 +7,6 @@
 
 import { assertEquals } from "https://deno.land/std@0.201.0/assert/assert_equals.ts";
 import { AssertionError } from "https://deno.land/std@0.201.0/assert/assertion_error.ts";
-import { deferred } from "https://deno.land/std@0.201.0/async/deferred.ts";
 import { FakeTime } from "https://deno.land/std@0.201.0/testing/time.ts";
 import type { Logger } from "https://deno.land/std@0.201.0/log/logger.ts";
 import {
@@ -972,7 +971,7 @@ function createReadableRunnerFromStream<T>(
   let closed = false;
   let done = false;
   let tickCount = 0;
-  let reading = deferred<void>();
+  let reading = Promise.withResolvers<void>();
   reading.resolve();
 
   const addLog = (frame: Frame) => {
@@ -990,7 +989,7 @@ function createReadableRunnerFromStream<T>(
       readableController = controller;
     },
     async pull(controller) {
-      reading = deferred();
+      reading = Promise.withResolvers();
       try {
         const res = await reader.read();
         if (!res.done) {
@@ -1014,7 +1013,7 @@ function createReadableRunnerFromStream<T>(
   reader.closed.then(
     async () => {
       if (!closed) {
-        await reading;
+        await reading.promise;
         closed = done = true;
         addLog({ type: "close" });
         readableController.close();
@@ -1081,7 +1080,8 @@ function createWritableRunnerFromFrames(
   let done = false;
   let frameIndex = -1;
   let tickCount = 0;
-  let ready = deferred<void>();
+  let ready = Promise.withResolvers<void>();
+  let readyState: "fulfilled" | "rejected" | "pending" = "fulfilled";
   ready.resolve();
 
   let writableController: WritableStreamDefaultController;
@@ -1093,10 +1093,10 @@ function createWritableRunnerFromFrames(
       logger.debug("createWritableRunnerFromFrames(): write", {
         testStreamId: currentTestStreamId,
         streamId,
-        ready: ready.state,
+        ready: readyState,
       });
       addLog({ type: "enqueue", value });
-      return ready;
+      return ready.promise;
     },
     close() {
       closed = done = true;
@@ -1129,8 +1129,10 @@ function createWritableRunnerFromFrames(
             apply: value,
           });
           if (value) {
-            ready = deferred();
+            readyState = "pending";
+            ready = Promise.withResolvers();
           } else {
+            readyState = "fulfilled";
             ready.resolve();
           }
           break;
@@ -1138,6 +1140,7 @@ function createWritableRunnerFromFrames(
         case "error": {
           closed = done = true;
           addLog({ type, value });
+          readyState = "rejected";
           ready.reject(value);
           writableController.error(value);
           break;
