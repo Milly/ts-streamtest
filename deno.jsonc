@@ -4,9 +4,12 @@
     "cache": "deno cache **/*.ts",
     "check": "deno lint && deno fmt --check && deno check **/*.ts",
     "coverage": "deno coverage .coverage",
-    "test": "deno test --allow-net --allow-read --doc --import-map=test_import_map.json",
+    "test": "deno test --allow-net --allow-read --doc",
     "testcov": "rm -rf .coverage && deno task test --coverage=.coverage",
     "testlog": "TESTLOG=1 deno task test --allow-env",
     "update": "deno run -A https://deno.land/x/udd/main.ts **/*.ts"
+  },
+  "imports": {
+    "https://deno.land/x/streamtest/": "./"
   }
 }
