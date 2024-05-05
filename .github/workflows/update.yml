@@ -35,36 +35,23 @@ jobs:
         run: deno task cache
 
       - name: Update and Commit
-        run: deno task update:commit
+        run: deno task update:commit > ../changelog.txt
 
-      - name: Check changes
-        id: changes
-        uses: andstor/file-existence-action@v3
-        with:
-          files: ../title.txt, ../body.md
-
-      - name: Read title.txt
-        id: title
-        if: steps.changes.outputs.files_exists == 'true'
+      - name: Read changelog.txt
+        id: changelog
         uses: juliangruber/read-file-action@v1
         with:
-          path: ../title.txt
-
-      - name: Read body.md
-        id: body
-        if: steps.changes.outputs.files_exists == 'true'
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ../body.md
+          path: ../changelog.txt
+          trim: true
 
       - name: Create Pull Request
-        if: steps.changes.outputs.files_exists == 'true'
+        if: steps.changelog.outputs.content != ''
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GH_TOKEN }}
           author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
           branch: ${{ inputs.head-branch }}
-          title: ${{ steps.title.outputs.content }}
-          body: ${{ steps.body.outputs.content }}
+          title: "build: Update dependencies"
+          body: ${{ steps.changelog.outputs.content }}
           labels: dependencies
           delete-branch: true
