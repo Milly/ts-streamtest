@@ -12,28 +12,6 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    strategy:
-      matrix:
-        runner:
-          - ubuntu-latest
-        deno-version:
-          - "v1.x"
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: "${{ matrix.deno-version }}"
-      - uses: actions/cache@v4
-        with:
-          key: deno-${{ hashFiles('deno.lock') }}
-          restore-keys: deno-
-          path: |
-            /home/runner/.cache/deno
-      - name: Check
-        run: deno task check
-
   test:
     strategy:
       matrix:
@@ -44,21 +22,30 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: denoland/setup-deno@v1
         with:
           deno-version: "${{ matrix.deno-version }}"
+
       - uses: actions/cache@v4
         with:
-          key: deno-${{ hashFiles('deno.lock') }}
+          key: deno-${{ hashFiles('deno.lock', '.github/workflows/**') }}
           restore-keys: deno-
           path: |
             /home/runner/.cache/deno
+
       - name: Cache
         run: deno task cache
+
+      - name: Check
+        run: deno task check
+
       - name: Test
         run: deno task test:coverage
+
       - name: Coverage
         run: deno task coverage --lcov --output=./lcov
+
       - uses: codecov/codecov-action@v4
         with:
           files: ./lcov
