@@ -856,26 +856,31 @@ describe("testStream", () => {
               await assertReadable(stream, "#", undefined, reason);
             });
           });
-          it(`should matches the stream created by \`readable\` and cancelled: ${toPrint(reason)}`, async () => {
+          it(`should matches the stream created with \`readable\` and cancelled: ${toPrint(reason)}`, async () => {
             await testStream(
               async ({ readable, abort, run, assertReadable }) => {
-                const actual = readable("--a---b---|");
+                const stream = readable("--a---b---|");
                 const expected = "       --a--!";
                 const signal = abort("   -----!");
 
-                await run([actual], (actual) => {
+                await run([stream], async (stream) => {
+                  const reader = stream.getReader();
                   signal.addEventListener("abort", () => {
-                    actual.cancel(reason);
+                    reader.cancel(reason);
                   }, { once: true });
+                  for (;;) {
+                    const { done } = await reader.read();
+                    if (done) break;
+                  }
                 });
 
-                await assertReadable(actual, expected, {}, reason);
+                await assertReadable(stream, expected, {}, reason);
               },
             );
           });
         }
       });
-      it("should matches the stream created by `readable`", async () => {
+      it("should matches the stream created with `readable`", async () => {
         await testStream(async ({ assertReadable, readable }) => {
           const stream = readable("abcd|");
 
@@ -1694,6 +1699,23 @@ describe("testStream", () => {
           await assertReadable(stream, expected, values);
         });
       });
+      it("should be pass throughs backpressure to the stream created with `readable`", async () => {
+        await testStream(
+          async ({ readable, writable, run, assertReadable }) => {
+            const stream = readable("1-2-3   -4-5-6-7-(8|)");
+            const dest = writable("  <--->   --<--------->      -----");
+            const expected = "       1---(23)-4-5--------(678|)";
+            // Apply backpressure ---^----------^
+            // Release backpressure -----^---------------^
+
+            await run([], () => {
+              stream.pipeTo(dest);
+            });
+
+            await assertReadable(stream, expected);
+          },
+        );
+      });
       it("should not advances time inside `fn` without delay", async () => {
         await testStream({
           tickTime: 100,
@@ -1734,7 +1756,7 @@ describe("testStream", () => {
           ["more than `tickTime * maxTicks`", 100 * 50 + 398],
         ] as const
       ) {
-        it(`should advances time by delay inside \`fn\`: ${name}`, async () => {
+        it(`should advances time with \`delay\` inside \`fn\`: ${name}`, async () => {
           await testStream({
             tickTime: 100,
             maxTicks: 50,
@@ -1751,7 +1773,7 @@ describe("testStream", () => {
             },
           });
         });
-        it(`should advances time by setTimeout before \`fn\`: ${name}`, async () => {
+        it(`should advances time with \`setTimeout\` before \`fn\`: ${name}`, async () => {
           await testStream({
             tickTime: 100,
             maxTicks: 50,
@@ -1769,7 +1791,7 @@ describe("testStream", () => {
             },
           });
         });
-        it(`should not advances time by setTimeout after \`fn\`: ${name}`, async () => {
+        it(`should not advances time with \`setTimeout\` after \`fn\`: ${name}`, async () => {
           await testStream({
             tickTime: 100,
             maxTicks: 50,

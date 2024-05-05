@@ -158,17 +158,15 @@ Deno.test("writable", async () => {
     //                    Aborts the dest stream ____/
 
     const source = readable("---a---b---c---d--- -  -----|");
-
-    const intermediate = source.pipeThrough(new TransformStream());
     const expected = "       ---a---b-----------(cd)--!";
     //       Apply backpressure ____^            ^^
     // Release backpressure and emits "c", "d" _/
 
-    await run([intermediate], async (intermediate) => {
-      intermediate.pipeTo(dest).catch(() => {});
+    await run([source], async (source) => {
+      await source.pipeTo(dest).catch(() => {});
     });
 
-    await assertReadable(intermediate, expected, {}, abortReason);
+    await assertReadable(source, expected, {}, abortReason);
   });
 });
 ```
