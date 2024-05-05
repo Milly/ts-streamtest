@@ -1,3 +1,5 @@
 export class TestStreamError extends Error {
-  override name = "TestStreamError";
+  static {
+    this.prototype.name = "TestStreamError";
+  }
 }

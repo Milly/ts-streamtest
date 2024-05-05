@@ -35,7 +35,7 @@ jobs:
         run: deno task cache
 
       - name: Update and Commit
-        run: deno task update:commit --summary ../title.txt --report ../body.md
+        run: deno task update:commit
 
       - name: Check changes
         id: changes

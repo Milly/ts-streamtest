@@ -1,8 +1,5 @@
-import { describe, it } from "https://deno.land/std@0.201.0/testing/bdd.ts";
-import {
-  assertEquals,
-  assertInstanceOf,
-} from "https://deno.land/std@0.201.0/assert/mod.ts";
+import { describe, it } from "@std/testing/bdd";
+import { assertEquals, assertInstanceOf } from "@std/assert";
 import { TestStreamError } from "./test_stream_error.ts";
 
 describe("TestStreamError", () => {
@@ -20,6 +17,9 @@ describe("TestStreamError", () => {
     const error = new TestStreamError();
 
     assertEquals(error.name, "TestStreamError");
+  });
+  it("should have a static name", () => {
+    assertEquals(TestStreamError.name, "TestStreamError");
   });
   it("should have a message", () => {
     const error = new TestStreamError();

@@ -1,5 +1,7 @@
 import { TestStreamError } from "./test_stream_error.ts";
 
 export class MaxTicksExceededError extends TestStreamError {
-  override name = "MaxTicksExceededError";
+  static {
+    this.prototype.name = "MaxTicksExceededError";
+  }
 }

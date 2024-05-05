@@ -1,12 +1,5 @@
-import {
-  beforeEach,
-  describe,
-  it,
-} from "https://deno.land/std@0.201.0/testing/bdd.ts";
-import {
-  assertSpyCalls,
-  spy,
-} from "https://deno.land/std@0.201.0/testing/mock.ts";
+import { beforeEach, describe, it } from "@std/testing/bdd";
+import { assertSpyCalls, spy } from "@std/testing/mock";
 import {
   assert,
   assertEquals,
@@ -18,10 +11,9 @@ import {
   assertRejects,
   assertStrictEquals,
   assertThrows,
-} from "https://deno.land/std@0.201.0/assert/mod.ts";
-import * as log from "https://deno.land/std@0.201.0/log/mod.ts";
-import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
-import { deferred } from "https://deno.land/std@0.201.0/async/deferred.ts";
+} from "@std/assert";
+import { ConsoleHandler, getLogger, setup } from "@std/log";
+import { delay } from "@std/async/delay";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -31,19 +23,19 @@ import {
   setLogger,
   testStream,
   type TestStreamHelper,
-  TestStreamHelperAbort,
+  type TestStreamHelperAbort,
   type TestStreamHelperAssertReadable,
   type TestStreamHelperReadable,
   type TestStreamHelperRun,
-  TestStreamHelperWritable,
+  type TestStreamHelperWritable,
 } from "./test_stream.ts";
 
 let baseTime = Date.now();
 try {
   if (Deno.env.has("TESTLOG")) {
-    log.setup({
+    setup({
       handlers: {
-        console: new log.handlers.ConsoleHandler("DEBUG", {
+        console: new ConsoleHandler("DEBUG", {
           formatter({ datetime, levelName, msg, args }) {
             return [
               ((datetime.getTime() - baseTime) / 1000).toFixed(3),
@@ -62,7 +54,7 @@ try {
         },
       },
     });
-    setLogger(log.getLogger("testStream"));
+    setLogger(getLogger("testStream"));
   }
 } catch (e: unknown) {
   if (!(e instanceof Deno.errors.PermissionDenied)) {
@@ -1648,12 +1640,12 @@ describe("testStream", () => {
       it("should be pass throughs backpressure to the specified streams", async () => {
         await testStream(async ({ writable, run, assertReadable }) => {
           let chunkCount = 0;
-          let ready = deferred<void>();
+          let ready = Promise.withResolvers<void>();
           const timer = setInterval(() => ready.resolve(), 200);
           const stream = new ReadableStream<number>({
             async pull(controller) {
-              await ready;
-              ready = deferred();
+              await ready.promise;
+              ready = Promise.withResolvers<void>();
               ++chunkCount;
               controller.enqueue(chunkCount);
             },
@@ -2090,12 +2082,12 @@ describe("testStream", () => {
         it("should applies backpressure with `<`", async () => {
           await testStream(async ({ writable, run }) => {
             let chunkCount = 0;
-            let ready = deferred<void>();
+            let ready = Promise.withResolvers<void>();
             const timer = setInterval(() => ready.resolve(), 200);
             const source = new ReadableStream<number>({
               async pull(controller) {
-                await ready;
-                ready = deferred();
+                await ready.promise;
+                ready = Promise.withResolvers();
                 ++chunkCount;
                 controller.enqueue(chunkCount);
               },
@@ -2132,12 +2124,12 @@ describe("testStream", () => {
         it("should release backpressure with `>`", async () => {
           await testStream(async ({ writable, run }) => {
             let chunkCount = 0;
-            let ready = deferred<void>();
+            let ready = Promise.withResolvers<void>();
             const timer = setInterval(() => ready.resolve(), 200);
             const source = new ReadableStream<number>({
               async pull(controller) {
-                await ready;
-                ready = deferred();
+                await ready.promise;
+                ready = Promise.withResolvers();
                 ++chunkCount;
                 controller.enqueue(chunkCount);
               },

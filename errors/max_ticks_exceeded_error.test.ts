@@ -1,8 +1,5 @@
-import { describe, it } from "https://deno.land/std@0.201.0/testing/bdd.ts";
-import {
-  assertEquals,
-  assertInstanceOf,
-} from "https://deno.land/std@0.201.0/assert/mod.ts";
+import { describe, it } from "@std/testing/bdd";
+import { assertEquals, assertInstanceOf } from "@std/assert";
 import { MaxTicksExceededError } from "./max_ticks_exceeded_error.ts";
 
 describe("MaxTicksExceededError", () => {
@@ -20,6 +17,9 @@ describe("MaxTicksExceededError", () => {
     const error = new MaxTicksExceededError();
 
     assertEquals(error.name, "MaxTicksExceededError");
+  });
+  it("should have a static name", () => {
+    assertEquals(MaxTicksExceededError.name, "MaxTicksExceededError");
   });
   it("should have a message", () => {
     const error = new MaxTicksExceededError();
