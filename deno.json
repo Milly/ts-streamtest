@@ -6,30 +6,38 @@
     "./examples/upper-case": "./examples/upper_case.ts"
   },
   "tasks": {
-    "cache": "deno cache **/*.ts --lock",
+    "cache": "deno cache **/*.ts --lock --config test.json",
     "lock": "deno task -q cache --lock-write",
-    "lock:commit": "deno task -q lock && git add deno.lock && git commit -m 'build(deps): update lockfile'",
-    "check": "deno lint && deno fmt --check && deno check **/*.ts",
-    "coverage": "deno coverage .coverage",
-    "test": "deno test --allow-net --allow-read --doc --no-lock",
+    "lock:commit": "deno task -q lock && git add deno.lock && git commit -m 'chore: update lockfile'",
+    "check": "deno lint && deno fmt --check && deno check **/*.ts --config test.json",
+    "test": "deno test --parallel --shuffle",
+    "test:doc": "deno task test --allow-net --allow-read --doc --config test.json",
     "test:coverage": "deno task test --coverage=.coverage",
     "test:log": "TESTLOG=1 deno task test --allow-env",
-    "pre-commit": "deno fmt && deno task -q check && deno task -q test",
-    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.2 deno.json",
-    "update:commit": "deno task update --commit --prefix 'build(deps):'"
+    "coverage": "deno coverage .coverage",
+    "pre-commit": "deno fmt && deno task -q check && deno task -q test:doc",
+    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.4 deno.json test.json",
+    "update:commit": "deno task update --commit --prefix 'chore:'"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@0.224.0",
     "@std/async": "jsr:@std/async@0.224.0",
     "@std/log": "jsr:@std/log@0.224.0",
-    "@std/testing": "jsr:@std/testing@0.224.0",
-    "@milly/streamtest": "./mod.ts",
-    "@milly/streamtest/examples/upper-case": "./examples/upper_case.ts"
+    "@std/testing": "jsr:@std/testing@0.224.0"
+  },
+  "test": {
+    "exclude": [
+      "examples/",
+      "README.test.ts"
+    ]
   },
   "publish": {
     "exclude": [
-      ".github/",
-      "**/*.test.*"
+      ".coverage/",
+      ".github/"
     ]
-  }
+  },
+  "exclude": [
+    ".coverage/"
+  ]
 }
