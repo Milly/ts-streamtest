@@ -1,5 +1,5 @@
 import { describe, it } from "@std/testing/bdd";
-import { testStream } from "../test_stream.ts";
+import { testStream } from "@milly/streamtest";
 import { UpperCase } from "./upper_case.ts";
 
 describe("UpperCase", () => {

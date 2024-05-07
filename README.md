@@ -103,7 +103,7 @@ specified for `testStream`, which has helper functions available only within
 that function.
 
 ```typescript
-import { testStream, type TestStreamHelper } from "jsr:@milly/streamtest";
+import { testStream, type TestStreamHelper } from "@milly/streamtest";
 
 Deno.test("MyTransformer", async () => {
   await testStream(async (helper: TestStreamHelper) => {
@@ -117,7 +117,7 @@ Deno.test("MyTransformer", async () => {
 Creates a `ReadableStream` with the specified `series`.
 
 ```typescript
-import { testStream } from "jsr:@milly/streamtest";
+import { testStream } from "@milly/streamtest";
 
 Deno.test("readable", async () => {
   await testStream(async ({ readable }) => {
@@ -147,7 +147,7 @@ Deno.test("readable", async () => {
 Creates a `WritableStream` with the specified `series`.
 
 ```typescript
-import { testStream } from "jsr:@milly/streamtest";
+import { testStream } from "@milly/streamtest";
 
 Deno.test("writable", async () => {
   await testStream(async ({ writable, readable, run, assertReadable }) => {
@@ -178,8 +178,8 @@ Deno.test("writable", async () => {
 Asserts that the readable stream matches the specified `series`.
 
 ```typescript
-import { testStream } from "jsr:@milly/streamtest";
-import { UpperCase } from "jsr:@milly/streamtest/examples/upper-case";
+import { testStream } from "@milly/streamtest";
+import { UpperCase } from "@milly/streamtest/examples/upper-case";
 
 Deno.test("assertReadable", async () => {
   await testStream(async ({ assertReadable, readable }) => {
@@ -210,9 +210,9 @@ Deno.test("assertReadable", async () => {
 Creates a `AbortSignal` with the specified `series`.
 
 ```typescript
-import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
-import { testStream } from "jsr:@milly/streamtest";
-import { delay } from "jsr:@std/async@0.224.0/delay";
+import { assertEquals } from "@std/assert/assert-equals";
+import { delay } from "@std/async/delay";
+import { testStream } from "@milly/streamtest";
 
 Deno.test("readable", async () => {
   await testStream(async ({ abort, run }) => {
@@ -238,9 +238,9 @@ Deno.test("readable", async () => {
 Process the test streams inside the `run` block.
 
 ```typescript
-import { assertEquals } from "jsr:@std/assert@0.224.0/assert-equals";
-import { testStream } from "jsr:@milly/streamtest";
-import { UpperCase } from "jsr:@milly/streamtest/examples/upper-case";
+import { assertEquals } from "@std/assert/assert-equals";
+import { testStream } from "@milly/streamtest";
+import { UpperCase } from "@milly/streamtest/examples/upper-case";
 
 Deno.test("run", async () => {
   await testStream(async ({ run, readable }) => {
