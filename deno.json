@@ -8,6 +8,7 @@
   "tasks": {
     "cache": "deno cache **/*.ts --lock",
     "lock": "deno task -q cache --lock-write",
+    "lock:commit": "deno task -q lock && git add deno.lock && git commit -m 'build(deps): update lockfile'",
     "check": "deno lint && deno fmt --check && deno check **/*.ts",
     "coverage": "deno coverage .coverage",
     "test": "deno test --allow-net --allow-read --doc --no-lock",
