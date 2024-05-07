@@ -14,7 +14,7 @@
     "test:coverage": "deno task test --coverage=.coverage",
     "test:log": "TESTLOG=1 deno task test --allow-env",
     "pre-commit": "deno fmt && deno task -q check && deno task -q test",
-    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.1 deno.json mod.ts --changelog --unstable-lock deno.lock",
+    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.2 deno.json mod.ts --changelog --unstable-lock deno.lock",
     "update:commit": "deno task update --commit --prefix 'build(deps):' --prefix-lock 'build(lock)'"
   },
   "imports": {
