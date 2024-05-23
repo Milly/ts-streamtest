@@ -19,16 +19,15 @@ import {
   MaxTicksExceededError,
   OperationNotPermittedError,
 } from "./errors/mod.ts";
-import {
-  setLogger,
-  testStream,
-  type TestStreamHelper,
-  type TestStreamHelperAbort,
-  type TestStreamHelperAssertReadable,
-  type TestStreamHelperReadable,
-  type TestStreamHelperRun,
-  type TestStreamHelperWritable,
-} from "./test_stream.ts";
+import type {
+  TestStreamHelper,
+  TestStreamHelperAbort,
+  TestStreamHelperAssertReadable,
+  TestStreamHelperReadable,
+  TestStreamHelperRun,
+  TestStreamHelperWritable,
+} from "./types.ts";
+import { setLogger, testStream } from "./test_stream.ts";
 
 let baseTime = Date.now();
 try {

@@ -3,6 +3,8 @@
   "version": "0.0.0",
   "exports": {
     ".": "./mod.ts",
+    "./errors": "./errors/mod.ts",
+    "./types": "./types.ts",
     "./examples/upper-case": "./examples/upper_case.ts"
   },
   "tasks": {
