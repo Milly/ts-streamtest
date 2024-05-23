@@ -820,30 +820,6 @@ function parseSignalSeries(series: string, reason?: unknown): Frame[] {
   return parseSeries(series, {}, reason);
 }
 
-function createControllReadable() {
-  let onCancelCallbacks: ((reason: unknown) => void)[] = [];
-  const onCancel = (callback: (reason: unknown) => void): void => {
-    onCancelCallbacks.push(callback);
-  };
-  let controller!: ReadableStreamDefaultController;
-  const readable = new ReadableStream({
-    start(con) {
-      controller = con;
-    },
-    cancel(reason) {
-      for (const callback of onCancelCallbacks) {
-        callback(reason);
-      }
-    },
-  }, { highWaterMark: 0 });
-  const dispose = () => {
-    controller?.error("ReadableStream disposed");
-    // deno-lint-ignore no-explicit-any
-    controller = onCancelCallbacks = null as any;
-  };
-  return { readable, controller, onCancel, dispose };
-}
-
 function createReadableRunnerFromFrames(
   frames: readonly Frame[],
   maxTicks: number,
@@ -859,12 +835,12 @@ function createReadableRunnerFromFrames(
     throw new MaxTicksExceededError("Ticks exceeded", { cause: { maxTicks } });
   }
 
-  const readable = createControllReadable();
   const log: Frame[] = [];
   let closed = false;
   let done = false;
   let frameIndex = -1;
   let tickCount = 0;
+  let ready = deferred<void>();
 
   const addLog = (frame: Frame) => {
     log.push(frame);
@@ -875,12 +851,25 @@ function createReadableRunnerFromFrames(
     });
   };
 
-  readable.onCancel((reason) => {
-    if (!done) {
-      closed = done = true;
-      addLog({ type: "cancel", value: reason });
-    }
-  });
+  let controller!: ReadableStreamDefaultController;
+  const readable = new ReadableStream({
+    start(con) {
+      controller = con;
+    },
+    pull() {
+      logger.debug("createReadableRunnerFromFrames(): pull", {
+        testStreamId: currentTestStreamId,
+        streamId,
+      });
+      ready.resolve();
+    },
+    cancel(reason) {
+      if (!done) {
+        closed = done = true;
+        addLog({ type: "cancel", value: reason });
+      }
+    },
+  }, { highWaterMark: 0 });
 
   const tick = (): void => {
     if (done || closed) return;
@@ -888,26 +877,37 @@ function createReadableRunnerFromFrames(
       const { type, value } = frames[frameIndex];
       switch (type) {
         case "enqueue": {
+          logger.debug("createReadableRunnerFromFrames(): enqueue", {
+            testStreamId: currentTestStreamId,
+            streamId,
+            ready: ready.state,
+          });
+          if (ready.state === "pending") {
+            --frameIndex;
+            ready.promise.then(tick);
+            return;
+          }
+          ready = deferred<void>();
           addLog({ type, value });
-          readable.controller.enqueue(value);
+          controller.enqueue(value);
           break;
         }
         case "close": {
           closed = true;
           addLog({ type });
-          readable.controller.close();
+          controller.close();
           break;
         }
         case "cancel": {
           closed = true;
           addLog({ type, value });
-          readable.controller.close();
+          controller.close();
           break;
         }
         case "error": {
           closed = true;
           addLog({ type, value });
-          readable.controller.error(value);
+          controller.error(value);
           break;
         }
         case "tick": {
@@ -938,14 +938,15 @@ function createReadableRunnerFromFrames(
   const dispose = () => {
     if (!closed) {
       closed = true;
-      readable.controller.close();
+      controller.close();
     }
-    readable.dispose();
+    // deno-lint-ignore no-explicit-any
+    controller = null as any;
   };
 
   return {
     id: streamId,
-    readable: readable.readable,
+    readable,
     tick,
     postTick,
     correctLog,
@@ -967,7 +968,7 @@ function createReadableRunnerFromStream<T>(
   let closed = false;
   let done = false;
   let tickCount = 0;
-  let reading = Promise.withResolvers<void>();
+  let reading = deferred<void>();
   reading.resolve();
 
   const addLog = (frame: Frame) => {
@@ -985,7 +986,7 @@ function createReadableRunnerFromStream<T>(
       readableController = controller;
     },
     async pull(controller) {
-      reading = Promise.withResolvers();
+      reading = deferred();
       try {
         const res = await reader.read();
         if (!res.done) {
@@ -1076,20 +1077,22 @@ function createWritableRunnerFromFrames(
   let done = false;
   let frameIndex = -1;
   let tickCount = 0;
-  let ready = Promise.withResolvers<void>();
-  let readyState: "fulfilled" | "rejected" | "pending" = "fulfilled";
-  ready.resolve();
+  let ready = deferred<void>();
+  if (frames[0]?.type !== "backpressure" || frames[0].value !== true) {
+    ready.resolve();
+  }
 
   let writableController: WritableStreamDefaultController;
   const writable = new WritableStream({
     start(controller) {
       writableController = controller;
+      return ready.promise;
     },
     write(value) {
       logger.debug("createWritableRunnerFromFrames(): write", {
         testStreamId: currentTestStreamId,
         streamId,
-        ready: readyState,
+        ready: ready.state,
       });
       addLog({ type: "enqueue", value });
       return ready.promise;
@@ -1124,19 +1127,16 @@ function createWritableRunnerFromFrames(
             streamId,
             apply: value,
           });
-          if (value) {
-            readyState = "pending";
-            ready = Promise.withResolvers();
-          } else {
-            readyState = "fulfilled";
+          if (!value) {
             ready.resolve();
+          } else if (ready.state !== "pending") {
+            ready = deferred();
           }
           break;
         }
         case "error": {
           closed = done = true;
           addLog({ type, value });
-          readyState = "rejected";
           ready.reject(value);
           writableController.error(value);
           break;
@@ -1225,4 +1225,24 @@ function fixStackTrace(e: object, ignoreFn: (...args: any[]) => any): void {
     Error.captureStackTrace?.(e, ignoreFn);
     fixedErrors.add(e);
   }
+}
+
+type PromiseState = "fulfilled" | "rejected" | "pending";
+function deferred<T>(): PromiseWithResolvers<T> & { state: PromiseState } {
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  let state: PromiseState = "pending";
+  return {
+    promise,
+    resolve(value) {
+      state = "fulfilled";
+      resolve(value);
+    },
+    reject(reason) {
+      state = "rejected";
+      reject(reason);
+    },
+    get state() {
+      return state;
+    },
+  };
 }
