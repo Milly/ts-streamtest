@@ -8,9 +8,6 @@
     "./examples/upper-case": "./examples/upper_case.ts"
   },
   "tasks": {
-    "cache": "deno cache **/*.ts --lock --config test.json",
-    "lock": "deno task -q cache --lock-write",
-    "lock:commit": "deno task -q lock && git add deno.lock && git commit -m 'chore: update lockfile'",
     "check": "deno lint && deno fmt --check && deno check **/*.ts --config test.json",
     "test": "deno test --parallel --shuffle",
     "test:doc": "deno task test --allow-net --allow-read --doc --config test.json",

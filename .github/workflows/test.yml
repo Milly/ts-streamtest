@@ -34,9 +34,6 @@ jobs:
           path: |
             /home/runner/.cache/deno
 
-      - name: Cache
-        run: deno task cache
-
       - name: Check
         run: deno task check
 
