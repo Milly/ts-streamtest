@@ -15,54 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Git
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-
-      - uses: denoland/setup-deno@v1
+      - uses: hasundue/molt-action@v1-rc
         with:
-          deno-version: v1.x
-
-      - uses: actions/cache/restore@v4
-        with:
-          key: deno-${{ hashFiles('deno.lock', '.github/workflows/**') }}
-          restore-keys: deno-
-          path: |
-            /home/runner/.cache/deno
-
-      - name: Cache
-        run: deno task cache
-
-      - name: Update and Commit
-        run: deno task update:commit | tee ../changelog.txt
-
-      - name: Lock and Commit
-        id: lock
-        continue-on-error: true
-        run: deno task lock:commit
-
-      - name: Read changelog.txt
-        id: changelog
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ../changelog.txt
-          trim: true
-
-      - name: Create Pull Request
-        if: steps.lock.outcome == 'success'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-          branch: ${{ inputs.head-branch }}
-          title: "build: Update dependencies"
-          body: ${{ steps.changelog.outputs.content }}
-          labels: dependencies
-          delete-branch: true
-
-      - uses: actions/cache/save@v4
-        with:
-          key: deno-${{ hashFiles('deno.lock', '.github/workflows/**') }}
-          path: |
-            /home/runner/.cache/deno
+          source: "{deno,test}.json{,c}"
