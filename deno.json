@@ -12,9 +12,10 @@
     "check": "deno lint && deno fmt --check && deno check **/*.ts --config test.json",
     "test": "deno test --parallel --shuffle",
     "test:doc": "deno task test --allow-net --allow-read --doc --config test.json",
-    "test:coverage": "deno task test --coverage=.coverage",
+    "test:coverage": "deno task coverage:clean && deno task test --coverage=.coverage",
     "test:log": "TESTLOG=1 deno task test --allow-env",
     "coverage": "deno coverage .coverage",
+    "coverage:clean": "rm -rf .coverage",
     "pre-commit": "deno fmt && deno task -q check && deno task -q test:doc",
     "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.4 deno.json test.json",
     "update:commit": "deno task update --commit --prefix 'chore:'"
