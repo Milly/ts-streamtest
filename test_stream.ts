@@ -15,6 +15,7 @@ import {
   OperationNotPermittedError,
   TestStreamError,
 } from "./errors/mod.ts";
+import { deferred } from "./deferred.ts";
 import type {
   TestStreamArgs,
   TestStreamDefinition,
@@ -994,24 +995,4 @@ function fixStackTrace(e: object, ignoreFn: (...args: any[]) => any): void {
     Error.captureStackTrace?.(e, ignoreFn);
     fixedErrors.add(e);
   }
-}
-
-type PromiseState = "fulfilled" | "rejected" | "pending";
-function deferred<T>(): PromiseWithResolvers<T> & { state: PromiseState } {
-  const { promise, resolve, reject } = Promise.withResolvers<T>();
-  let state: PromiseState = "pending";
-  return {
-    promise,
-    resolve(value) {
-      state = "fulfilled";
-      resolve(value);
-    },
-    reject(reason) {
-      state = "rejected";
-      reject(reason);
-    },
-    get state() {
-      return state;
-    },
-  };
 }
