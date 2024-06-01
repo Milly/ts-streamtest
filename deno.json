@@ -1,6 +1,6 @@
 {
   "name": "@milly/streamtest",
-  "version": "0.13.0",
+  "version": "1.0.0-rc1",
   "exports": {
     ".": "./mod.ts",
     "./errors": "./errors/mod.ts",
@@ -32,15 +32,9 @@
     "@types/sinonjs__fake-timers": "npm:@types/sinonjs__fake-timers@^8.1.5",
     "bdd": "jsr:@std/testing@0.224.0/bdd"
   },
-  "test": {
-    "exclude": [
-      "node_modules/"
-    ]
-  },
   "publish": {
     "exclude": [
       "**/*.test.ts",
-      ".*",
       "package-lock.json",
       "package.json",
       "testutil/",
@@ -48,6 +42,7 @@
     ]
   },
   "exclude": [
-    ".coverage/"
+    ".*",
+    "node_modules/"
   ]
 }
