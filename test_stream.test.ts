@@ -12,8 +12,8 @@ import {
   assertStrictEquals,
   assertThrows,
 } from "@std/assert";
-import { ConsoleHandler, getLogger, setup } from "@std/log";
 import { delay } from "@std/async/delay";
+import { hasEnv } from "@cross/env";
 import {
   LeakingAsyncOpsError,
   MaxTicksExceededError,
@@ -28,38 +28,15 @@ import type {
   TestStreamHelperWritable,
 } from "./types.ts";
 import { deferred } from "./deferred.ts";
-import { setLogger, testStream } from "./test_stream.ts";
+import { resetBaseTime, setupDebugLogger } from "./logger.ts";
+import { testStream } from "./test_stream.ts";
 
-let baseTime = Date.now();
 try {
-  if (Deno.env.has("TESTLOG")) {
-    setup({
-      handlers: {
-        console: new ConsoleHandler("DEBUG", {
-          formatter({ datetime, levelName, msg, args }) {
-            return [
-              ((datetime.getTime() - baseTime) / 1000).toFixed(3),
-              levelName,
-              msg,
-              ":",
-              Deno.inspect(args, { colors: true }),
-            ].join(" ");
-          },
-        }),
-      },
-      loggers: {
-        testStream: {
-          level: "DEBUG",
-          handlers: ["console"],
-        },
-      },
-    });
-    setLogger(getLogger("testStream"));
+  if (hasEnv("TESTLOG")) {
+    setupDebugLogger();
   }
-} catch (e: unknown) {
-  if (!(e instanceof Deno.errors.PermissionDenied)) {
-    throw e;
-  }
+} catch {
+  // Permission denied to get environment vars, do nothing.
 }
 
 class MyCustomError extends Error {
@@ -99,7 +76,7 @@ function pipeToChunks(
 
 describe("testStream", () => {
   beforeEach(() => {
-    baseTime = Date.now();
+    resetBaseTime();
   });
   describe("arguments", () => {
     describe("(options)", () => {

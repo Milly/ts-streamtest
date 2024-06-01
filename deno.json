@@ -20,6 +20,8 @@
     "update:commit": "deno task update --commit --prefix 'chore:'"
   },
   "imports": {
+    "@cross/env": "jsr:@cross/env@^1.0.2",
+    "@cross/runtime": "jsr:@cross/runtime@^1.0.0",
     "@milly/streamtest": "./mod.ts",
     "@milly/streamtest/examples/upper-case": "./examples/upper_case.ts",
     "@std/assert": "jsr:@std/assert@0.225.3",
