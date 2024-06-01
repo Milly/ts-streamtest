@@ -7,7 +7,6 @@
 
 import { assertEquals } from "@std/assert/assert-equals";
 import { AssertionError } from "@std/assert/assertion-error";
-import { FakeTime } from "@std/testing/time";
 import type { Logger } from "@std/log";
 import {
   LeakingAsyncOpsError,
@@ -16,6 +15,7 @@ import {
   TestStreamError,
 } from "./errors/mod.ts";
 import { deferred } from "./deferred.ts";
+import { FakeTime } from "./timers.ts";
 import type {
   TestStreamArgs,
   TestStreamDefinition,
@@ -205,8 +205,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
             processedRunners.add(runner);
           }
         }
-        await time.tickAsync(0);
-        if (disposed) return;
+        await time.runMicrotasks();
+        time.tick(0);
         await time.runMicrotasks();
         if (disposed) return;
       } while (processedRunners.size < activeRunners.size);
@@ -224,8 +224,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       do {
         // Do not use `nextAsync()` to avoid microtasks after `next`.
         await time.runMicrotasks();
-        time.next();
         if (disposed) return;
+        time.next();
       } while (untilNext);
     }
   };
@@ -289,13 +289,16 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       : NOOP;
 
     const ticksRunner = async () => {
+      let hasTimer = false;
       do {
         await processAllTicks();
         if (disposed) return;
         // Do not use `nextAsync()` to avoid microtasks after `next`.
         await time.runMicrotasks();
         if (disposed) return;
-      } while (time.next() || fnContinue || activeRunners.size > 0);
+        hasTimer = time.timerCount > 0;
+        time.next();
+      } while (hasTimer || fnContinue || activeRunners.size > 0);
     };
 
     await time.runMicrotasks();
@@ -419,7 +422,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   const time = new FakeTime();
-  const fakeSetTimeout = setTimeout;
+  const fakeSetTimeout = time.clock.setTimeout;
   return executeFn()
     .finally(() => {
       // Dispose resources.

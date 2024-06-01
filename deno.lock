@@ -18,7 +18,10 @@
       "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.0",
       "jsr:@std/io@^0.224.0": "jsr:@std/io@0.224.0",
       "jsr:@std/log@0.224.1": "jsr:@std/log@0.224.1",
-      "jsr:@std/testing@0.224.0": "jsr:@std/testing@0.224.0"
+      "jsr:@std/testing@0.224.0": "jsr:@std/testing@0.224.0",
+      "npm:@sinonjs/fake-timers@^11.2.2": "npm:@sinonjs/fake-timers@11.2.2",
+      "npm:@types/node": "npm:@types/node@18.16.19",
+      "npm:@types/sinonjs__fake-timers@^8.1.5": "npm:@types/sinonjs__fake-timers@8.1.5"
     },
     "jsr": {
       "@cross/deepmerge@1.0.0": {
@@ -87,6 +90,32 @@
           "jsr:@std/data-structures@^0.224.0"
         ]
       }
+    },
+    "npm": {
+      "@sinonjs/commons@3.0.1": {
+        "integrity": "sha512-K3mCHKQ9sVh8o1C9cxkwxaOmXoAMlDxC1mYyHrjqOWEcBjYr76t96zL2zlj5dUGZ3HSw240X1qgH3Mjf1yJWpQ==",
+        "dependencies": {
+          "type-detect": "type-detect@4.0.8"
+        }
+      },
+      "@sinonjs/fake-timers@11.2.2": {
+        "integrity": "sha512-G2piCSxQ7oWOxwGSAyFHfPIsyeJGXYtc6mFbnFA+kRXkiEnTl8c/8jul2S329iFBnDI9HGoeWWAZvuvOkZccgw==",
+        "dependencies": {
+          "@sinonjs/commons": "@sinonjs/commons@3.0.1"
+        }
+      },
+      "@types/node@18.16.19": {
+        "integrity": "sha512-IXl7o+R9iti9eBW4Wg2hx1xQDig183jj7YLn8F7udNceyfkbn1ZxmzZXuak20gR40D7pIkIY1kYGx5VIGbaHKA==",
+        "dependencies": {}
+      },
+      "@types/sinonjs__fake-timers@8.1.5": {
+        "integrity": "sha512-mQkU2jY8jJEF7YHjHvsQO8+3ughTL1mcnn96igfhONmR+fUPSKIkefQYpSe8bsly2Ep7oQbn/6VG5/9/0qcArQ==",
+        "dependencies": {}
+      },
+      "type-detect@4.0.8": {
+        "integrity": "sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g==",
+        "dependencies": {}
+      }
     }
   },
   "remote": {},
@@ -97,7 +126,9 @@
       "jsr:@std/assert@0.225.3",
       "jsr:@std/async@0.224.1",
       "jsr:@std/log@0.224.1",
-      "jsr:@std/testing@0.224.0"
+      "jsr:@std/testing@0.224.0",
+      "npm:@sinonjs/fake-timers@^11.2.2",
+      "npm:@types/sinonjs__fake-timers@^8.1.5"
     ]
   }
 }
