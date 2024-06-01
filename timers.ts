@@ -7,10 +7,8 @@ import {
   timers,
 } from "@sinonjs/fake-timers";
 
-declare module "@sinonjs/fake-timers" {
-  interface FakeClock<TTimerId extends TimerId> {
-    jobs?: unknown[];
-  }
+interface FakeClockJobs {
+  jobs?: unknown[];
 }
 
 export const delayImmediate: () => Promise<void> = (() => {
@@ -58,7 +56,7 @@ export class FakeTime implements Disposable {
     this.#assertDisposed();
     for (;;) {
       await delayImmediate();
-      if (!(this.#clock?.jobs?.length)) break;
+      if (!((this.#clock as FakeClockJobs)?.jobs?.length)) break;
       (this.#clock as NodeClock).runMicrotasks();
     }
   }
