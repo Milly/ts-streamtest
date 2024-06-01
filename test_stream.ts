@@ -206,6 +206,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
           }
         }
         await time.runMicrotasks();
+        if (disposed) return;
         time.tick(0);
         await time.runMicrotasks();
         if (disposed) return;

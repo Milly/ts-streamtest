@@ -1722,6 +1722,31 @@ describe("testStream", () => {
         // runPromise should not rejects.
         await runPromise;
       });
+      it("should not rejects if called without await and `testStream` block is disposed reader is resolved", async () => {
+        let runPromise!: Promise<void>;
+        await testStream(async ({ run, readable }) => {
+          const stream = readable("a-|");
+
+          const nextWaiter = deferred<void>();
+
+          runPromise = run([stream], async () => {
+            const reader = stream.getReader();
+            try {
+              await reader.read();
+              nextWaiter.resolve();
+            } finally {
+              reader.releaseLock();
+            }
+          });
+
+          await nextWaiter.promise;
+        }).catch(() => {
+          // Ignore LeakingAsyncOpsError
+        });
+
+        // runPromise should not rejects.
+        await runPromise;
+      });
       for (
         const [name, t] of [
           ["0", 0],
