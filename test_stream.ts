@@ -7,7 +7,6 @@
 
 import { assertEquals } from "@std/assert/assert-equals";
 import { AssertionError } from "@std/assert/assertion-error";
-import { FakeTime } from "@std/testing/time";
 import type { Logger } from "@std/log";
 import {
   LeakingAsyncOpsError,
@@ -15,6 +14,8 @@ import {
   OperationNotPermittedError,
   TestStreamError,
 } from "./errors/mod.ts";
+import { deferred } from "./deferred.ts";
+import { FakeTime } from "./timers.ts";
 import type {
   TestStreamArgs,
   TestStreamDefinition,
@@ -26,7 +27,7 @@ import type {
   TestStreamHelperRunFn,
   TestStreamHelperWritable,
 } from "./types.ts";
-import type { MutableTuple } from "./_internal_types.ts";
+import type { MutableTuple } from "./internal_types.ts";
 
 const DEFAULT_TICK_TIME = 100;
 const DEFAULT_MAX_TICKS = 50;
@@ -204,8 +205,9 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
             processedRunners.add(runner);
           }
         }
-        await time.tickAsync(0);
+        await time.runMicrotasks();
         if (disposed) return;
+        time.tick(0);
         await time.runMicrotasks();
         if (disposed) return;
       } while (processedRunners.size < activeRunners.size);
@@ -223,8 +225,8 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       do {
         // Do not use `nextAsync()` to avoid microtasks after `next`.
         await time.runMicrotasks();
-        time.next();
         if (disposed) return;
+        time.next();
       } while (untilNext);
     }
   };
@@ -288,13 +290,16 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
       : NOOP;
 
     const ticksRunner = async () => {
+      let hasTimer = false;
       do {
         await processAllTicks();
         if (disposed) return;
         // Do not use `nextAsync()` to avoid microtasks after `next`.
         await time.runMicrotasks();
         if (disposed) return;
-      } while (time.next() || fnContinue || activeRunners.size > 0);
+        hasTimer = time.timerCount > 0;
+        time.next();
+      } while (hasTimer || fnContinue || activeRunners.size > 0);
     };
 
     await time.runMicrotasks();
@@ -418,7 +423,7 @@ export function testStream(...args: TestStreamArgs): Promise<void> {
   };
 
   const time = new FakeTime();
-  const fakeSetTimeout = setTimeout;
+  const fakeSetTimeout = time.clock.setTimeout;
   return executeFn()
     .finally(() => {
       // Dispose resources.
@@ -994,24 +999,4 @@ function fixStackTrace(e: object, ignoreFn: (...args: any[]) => any): void {
     Error.captureStackTrace?.(e, ignoreFn);
     fixedErrors.add(e);
   }
-}
-
-type PromiseState = "fulfilled" | "rejected" | "pending";
-function deferred<T>(): PromiseWithResolvers<T> & { state: PromiseState } {
-  const { promise, resolve, reject } = Promise.withResolvers<T>();
-  let state: PromiseState = "pending";
-  return {
-    promise,
-    resolve(value) {
-      state = "fulfilled";
-      resolve(value);
-    },
-    reject(reason) {
-      state = "rejected";
-      reject(reason);
-    },
-    get state() {
-      return state;
-    },
-  };
 }

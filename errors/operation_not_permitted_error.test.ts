@@ -1,4 +1,4 @@
-import { describe, it } from "@std/testing/bdd";
+import { describe, it } from "bdd";
 import { assertEquals, assertInstanceOf } from "@std/assert";
 import { OperationNotPermittedError } from "./operation_not_permitted_error.ts";
 
