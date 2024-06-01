@@ -105,7 +105,7 @@ that function.
 ```typescript
 import { testStream, type TestStreamHelper } from "@milly/streamtest";
 
-Deno.test("MyTransformer", async () => {
+Deno.test("use testStream", async () => {
   await testStream(async (helper: TestStreamHelper) => {
     // ... test logic using helper.assertReadable, helper.readable, and helper.run ...
   });
@@ -119,7 +119,7 @@ Creates a `ReadableStream` with the specified `series`.
 ```typescript
 import { testStream } from "@milly/streamtest";
 
-Deno.test("readable", async () => {
+Deno.test("use readable helper", async () => {
   await testStream(async ({ readable }) => {
     const abortReason = new Error("abort");
     const values = {
@@ -149,7 +149,7 @@ Creates a `WritableStream` with the specified `series`.
 ```typescript
 import { testStream } from "@milly/streamtest";
 
-Deno.test("writable", async () => {
+Deno.test("use writable helper", async () => {
   await testStream(async ({ writable, readable, run, assertReadable }) => {
     const abortReason = new Error("abort");
 
@@ -179,7 +179,7 @@ Asserts that the readable stream matches the specified `series`.
 import { testStream } from "@milly/streamtest";
 import { UpperCase } from "@milly/streamtest/examples/upper-case";
 
-Deno.test("assertReadable", async () => {
+Deno.test("use assertReadable helper", async () => {
   await testStream(async ({ assertReadable, readable }) => {
     const abortReason = new Error("abort");
     const values = {
@@ -212,7 +212,7 @@ import { assertEquals } from "@std/assert/assert-equals";
 import { delay } from "@std/async/delay";
 import { testStream } from "@milly/streamtest";
 
-Deno.test("readable", async () => {
+Deno.test("use abort helper", async () => {
   await testStream(async ({ abort, run }) => {
     const abortReason = new Error("abort");
 
@@ -240,7 +240,7 @@ import { assertEquals } from "@std/assert/assert-equals";
 import { testStream } from "@milly/streamtest";
 import { UpperCase } from "@milly/streamtest/examples/upper-case";
 
-Deno.test("run", async () => {
+Deno.test("use run helper", async () => {
   await testStream(async ({ run, readable }) => {
     const source = readable("--a--b--c--|");
 
