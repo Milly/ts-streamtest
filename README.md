@@ -1,10 +1,9 @@
 # streamtest
 
-[![license:MIT](https://img.shields.io/github/license/Milly/deno-streamtest)](LICENSE)
+[![license:MIT](https://img.shields.io/github/license/Milly/ts-streamtest)](LICENSE)
 [![jsr](https://jsr.io/badges/@milly/streamtest)](https://jsr.io/@milly/streamtest)
-[![deno land](http://img.shields.io/badge/available%20on-deno.land/x-lightgrey.svg?logo=deno)](https://deno.land/x/streamtest)
-[![Test](https://github.com/Milly/deno-streamtest/workflows/Test/badge.svg)](https://github.com/Milly/deno-streamtest/actions?query=workflow%3ATest)
-[![codecov](https://codecov.io/gh/Milly/deno-streamtest/branch/master/graph/badge.svg?token=81L4DWDPIJ)](https://codecov.io/gh/Milly/deno-streamtest)
+[![Test](https://github.com/Milly/ts-streamtest/workflows/Test/badge.svg)](https://github.com/Milly/ts-streamtest/actions?query=workflow%3ATest)
+[![codecov](https://codecov.io/gh/Milly/ts-streamtest/branch/master/graph/badge.svg?token=81L4DWDPIJ)](https://codecov.io/gh/Milly/ts-streamtest)
 
 **streamtest** is a library for testing streams. Provides helper functions that
 make it easier to test streams with various scenarios and assertions.
