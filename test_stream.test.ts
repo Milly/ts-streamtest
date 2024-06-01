@@ -27,6 +27,7 @@ import type {
   TestStreamHelperRun,
   TestStreamHelperWritable,
 } from "./types.ts";
+import { deferred } from "./deferred.ts";
 import { setLogger, testStream } from "./test_stream.ts";
 
 let baseTime = Date.now();
@@ -1644,12 +1645,12 @@ describe("testStream", () => {
       it("should be pass throughs backpressure to the specified streams", async () => {
         await testStream(async ({ writable, run, assertReadable }) => {
           let chunkCount = 0;
-          let ready = Promise.withResolvers<void>();
+          let ready = deferred<void>();
           const timer = setInterval(() => ready.resolve(), 200);
           const stream = new ReadableStream<number>({
             async pull(controller) {
               await ready.promise;
-              ready = Promise.withResolvers<void>();
+              ready = deferred();
               ++chunkCount;
               controller.enqueue(chunkCount);
             },
@@ -2103,12 +2104,12 @@ describe("testStream", () => {
         it("should applies backpressure with `<`", async () => {
           await testStream(async ({ writable, run }) => {
             let chunkCount = 0;
-            let ready = Promise.withResolvers<void>();
+            let ready = deferred<void>();
             const timer = setInterval(() => ready.resolve(), 200);
             const source = new ReadableStream<number>({
               async pull(controller) {
                 await ready.promise;
-                ready = Promise.withResolvers();
+                ready = deferred();
                 ++chunkCount;
                 controller.enqueue(chunkCount);
               },
@@ -2145,12 +2146,12 @@ describe("testStream", () => {
         it("should release backpressure with `>`", async () => {
           await testStream(async ({ writable, run }) => {
             let chunkCount = 0;
-            let ready = Promise.withResolvers<void>();
+            let ready = deferred<void>();
             const timer = setInterval(() => ready.resolve(), 200);
             const source = new ReadableStream<number>({
               async pull(controller) {
                 await ready.promise;
-                ready = Promise.withResolvers();
+                ready = deferred();
                 ++chunkCount;
                 controller.enqueue(chunkCount);
               },
