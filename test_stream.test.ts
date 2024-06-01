@@ -29,11 +29,11 @@ import type {
 } from "./types.ts";
 import { deferred } from "./deferred.ts";
 import { resetBaseTime, setupDebugLogger } from "./testutil/logger.ts";
-import { testStream } from "./test_stream.ts";
+import { setLogger, testStream } from "./test_stream.ts";
 
 try {
   if (hasEnv("TESTLOG")) {
-    setupDebugLogger();
+    setLogger(setupDebugLogger());
   }
 } catch {
   // Permission denied to get environment vars, do nothing.

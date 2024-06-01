@@ -1,6 +1,5 @@
 import { CurrentRuntime } from "@cross/runtime";
-import { ConsoleHandler, getLogger, setup } from "@std/log";
-import { setLogger } from "../test_stream.ts";
+import { ConsoleHandler, getLogger, type Logger, setup } from "@std/log";
 
 let baseTime = 0;
 
@@ -8,7 +7,7 @@ export function resetBaseTime(): void {
   baseTime = Date.now();
 }
 
-export function setupDebugLogger(): void {
+export function setupDebugLogger(): Logger {
   const inspect = CurrentRuntime === "deno"
     ? Deno.inspect
     : (args: unknown) => JSON.stringify(args, null, 2);
@@ -33,6 +32,6 @@ export function setupDebugLogger(): void {
       },
     },
   });
-  setLogger(getLogger("testStream"));
   resetBaseTime();
+  return getLogger("testStream");
 }
