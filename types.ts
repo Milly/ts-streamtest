@@ -6,7 +6,7 @@
  * @module
  */
 
-import type { MutableTuple } from "./_internal_types.ts";
+import type { MutableTuple } from "./internal_types.ts";
 
 /** The arguments for the `testStream` function. */
 export type TestStreamArgs =

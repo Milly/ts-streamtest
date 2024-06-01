@@ -27,7 +27,7 @@ import type {
   TestStreamHelperRunFn,
   TestStreamHelperWritable,
 } from "./types.ts";
-import type { MutableTuple } from "./_internal_types.ts";
+import type { MutableTuple } from "./internal_types.ts";
 
 const DEFAULT_TICK_TIME = 100;
 const DEFAULT_MAX_TICKS = 50;

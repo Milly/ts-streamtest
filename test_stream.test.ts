@@ -28,7 +28,7 @@ import type {
   TestStreamHelperWritable,
 } from "./types.ts";
 import { deferred } from "./deferred.ts";
-import { resetBaseTime, setupDebugLogger } from "./logger.ts";
+import { resetBaseTime, setupDebugLogger } from "./testutil/logger.ts";
 import { testStream } from "./test_stream.ts";
 
 try {

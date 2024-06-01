@@ -1,6 +1,6 @@
 import { CurrentRuntime } from "@cross/runtime";
 import { ConsoleHandler, getLogger, setup } from "@std/log";
-import { setLogger } from "./test_stream.ts";
+import { setLogger } from "../test_stream.ts";
 
 let baseTime = 0;
 

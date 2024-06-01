@@ -39,7 +39,12 @@
   },
   "publish": {
     "exclude": [
-      ".github/"
+      "**/*.test.ts",
+      ".*",
+      "package-lock.json",
+      "package.json",
+      "testutil/",
+      "tsconfig.json"
     ]
   },
   "exclude": [
