@@ -138,8 +138,8 @@
         "npm:@jsr/std__log@^0.224.1",
         "npm:@jsr/std__testing@^0.224.0",
         "npm:@sinonjs/fake-timers@^11.2.2",
-        "npm:mocha@^10.4.0",
-        "npm:ts-node@^10.9.2"
+        "npm:glob@^10.4.1",
+        "npm:tsx@^4.11.0"
       ]
     }
   }

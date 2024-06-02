@@ -1,4 +1,4 @@
-import { describe, it } from "bdd";
+import { describe, it } from "#bdd";
 import { assertInstanceOf, assertMatch } from "@std/assert";
 import { assertSpyCalls, stub } from "@std/testing/mock";
 import { Logger } from "@std/log";

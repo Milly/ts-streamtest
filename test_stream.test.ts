@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from "bdd";
+import { beforeEach, describe, it } from "#bdd";
 import { assertSpyCalls, spy } from "@std/testing/mock";
 import {
   assert,

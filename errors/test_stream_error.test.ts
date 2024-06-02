@@ -1,4 +1,4 @@
-import { describe, it } from "bdd";
+import { describe, it } from "#bdd";
 import { assertEquals, assertInstanceOf } from "@std/assert";
 import { TestStreamError } from "./test_stream_error.ts";
 
