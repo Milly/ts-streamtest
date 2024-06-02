@@ -1,4 +1,4 @@
-// @deno-types="@types/sinonjs__fake-timers"
+// @deno-types="npm:@types/sinonjs__fake-timers@^8.1.5"
 import {
   type FakeMethod,
   install,
