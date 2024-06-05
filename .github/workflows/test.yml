@@ -98,3 +98,33 @@ jobs:
 
       - name: Test
         run: npm run test
+
+  test-browser:
+    needs: check
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+        browser:
+          - chromium
+          - firefox
+          - webkit
+    timeout-minutes: 20
+    runs-on: ${{ matrix.runner }}
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Setup
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: npm run test:browser:${{ matrix.browser }}
