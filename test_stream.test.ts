@@ -28,7 +28,8 @@ import type {
   TestStreamHelperWritable,
 } from "./types.ts";
 import { deferred } from "./deferred.ts";
-import { resetBaseTime, setupDebugLogger } from "./testutil/logger.ts";
+import { resetBaseTime, setupDebugLogger } from "./tests/util/logger.ts";
+import { from } from "./tests/util/from.ts";
 import { setLogger, testStream } from "./test_stream.ts";
 
 try {
@@ -545,7 +546,7 @@ describe("testStream", () => {
     describe(".assertReadable", () => {
       it("should rejects if called within `run`", async () => {
         await testStream(async ({ assertReadable, run }) => {
-          const stream = ReadableStream.from(["a", "b", "c"]);
+          const stream = from(["a", "b", "c"]);
 
           await run([], async () => {
             await assertRejects(
@@ -560,7 +561,7 @@ describe("testStream", () => {
       });
       it("should rejects if called outside `testStream`", async () => {
         let savedAssertReadable: TestStreamHelperAssertReadable;
-        const stream = ReadableStream.from(["a", "b", "c"]);
+        const stream = from(["a", "b", "c"]);
 
         await testStream(({ assertReadable }) => {
           savedAssertReadable = assertReadable;
@@ -600,7 +601,7 @@ describe("testStream", () => {
         }
         it("should not rejects if actual matches expectedSeries", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from(["a", "b", "c"]);
+            const stream = from(["a", "b", "c"]);
 
             const p = assertReadable(stream, "(abc|)");
             const actual = await p.catch((e) => e);
@@ -610,7 +611,7 @@ describe("testStream", () => {
         });
         it("should rejects if actual does not matches expectedSeries", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from(["a", "b", "c", "d"]);
+            const stream = from(["a", "b", "c", "d"]);
 
             await assertRejects(
               async () => {
@@ -658,7 +659,7 @@ describe("testStream", () => {
         });
         it("should matches `|` to close the stream", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from([]);
+            const stream = from([]);
 
             await assertReadable(stream, "|");
           });
@@ -749,7 +750,7 @@ describe("testStream", () => {
       describe("(..., expectedValues, ...)", () => {
         it("should be possible to specify a record with any key and value", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from([
+            const stream = from([
               "foo",
               42,
               true,
@@ -774,14 +775,14 @@ describe("testStream", () => {
         });
         it("should be possible to specify an empty record", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from(["a", "b", "c"]);
+            const stream = from(["a", "b", "c"]);
 
             await assertReadable(stream, "(abc|)", {});
           });
         });
         it("should be possible to specify undefined", async () => {
           await testStream(async ({ assertReadable }) => {
-            const stream = ReadableStream.from(["a", "b", "c"]);
+            const stream = from(["a", "b", "c"]);
 
             await assertReadable(stream, "(abc|)", undefined);
           });

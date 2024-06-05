@@ -8,10 +8,11 @@
     "./examples/upper-case": "./examples/upper_case.ts"
   },
   "tasks": {
-    "check": "deno lint && deno fmt --check && deno check *.ts errors/*.ts examples/*.ts",
+    "check": "deno lint && deno fmt --check && deno check *.ts errors/**/*.ts examples/**/*.ts scripts/**/*.ts tests/**/*.ts",
     "test": "deno test --allow-net --allow-read",
+    "test:all": "deno task check && deno task test:doc && npm run test && npm run test:browser",
     "test:doc": "deno task test --doc",
-    "test:coverage": "deno task coverage:clean && deno task test --parallel --shuffle --coverage=.coverage",
+    "test:coverage": "deno task coverage:clean && deno task test:doc --parallel --shuffle --coverage=.coverage",
     "test:log": "TESTLOG=1 deno task test --allow-env",
     "coverage": "deno coverage .coverage",
     "coverage:clean": "rm -rf .coverage",
@@ -20,7 +21,7 @@
     "update:commit": "deno task update --commit --prefix 'chore:'"
   },
   "imports": {
-    "#bdd": "jsr:@std/testing@0.224.0/bdd",
+    "#bdd": "./tests/util/bdd.deno.ts",
     "@cross/env": "jsr:@cross/env@^1.0.2",
     "@cross/runtime": "jsr:@cross/runtime@^1.0.0",
     "@milly/streamtest": "./mod.ts",
@@ -36,7 +37,9 @@
       "**/*.ts"
     ],
     "exclude": [
-      "**/*.node.ts"
+      "scripts/",
+      "tests/browser/",
+      "tests/node.*"
     ]
   },
   "publish": {
@@ -44,12 +47,14 @@
       "**/*.test.ts",
       "package-lock.json",
       "package.json",
-      "testutil/",
+      "scripts/",
+      "tests/",
       "tsconfig.json"
     ]
   },
   "exclude": [
     ".*",
-    "node_modules/"
+    "node_modules/",
+    "test-results/"
   ]
 }
