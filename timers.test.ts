@@ -6,7 +6,6 @@ import {
   assertStrictEquals,
   assertThrows,
 } from "@std/assert";
-import { delay } from "@std/async/delay";
 import { delayImmediate, FakeTime } from "./timers.ts";
 
 const origSetTimeout = setTimeout;
@@ -20,14 +19,17 @@ describe("delayImmediate()", () => {
     await delayImmediate();
     assertEquals(logs, ["foo", "bar"]);
   });
-  it("should resolves before 0ms timer", async () => {
+  it("should resolves multiple calls", async () => {
     const logs: string[] = [];
-    setTimeout(() => logs.push("foo"), 0);
-    assertEquals(logs, []);
-    await delayImmediate();
-    assertEquals(logs, []);
-    await delay(0);
-    assertEquals(logs, ["foo"]);
+    await Promise.all([
+      delayImmediate().then(() => {
+        logs.push("a");
+        return delayImmediate().then(() => logs.push("d"));
+      }),
+      delayImmediate().then(() => logs.push("b")),
+      delayImmediate().then(() => logs.push("c")),
+    ]);
+    assertEquals(logs, ["a", "b", "c", "d"]);
   });
 });
 
