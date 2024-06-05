@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it } from "bdd";
+import { afterEach, beforeEach, describe, it } from "#bdd";
 import {
   assertEquals,
   assertNotStrictEquals,
