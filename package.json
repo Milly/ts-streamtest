@@ -5,7 +5,7 @@
     ".": "./mod.ts"
   },
   "scripts": {
-    "test": "glob -x -c \"node --test --import=tsx/esm\" -i \"node_modules/**\" \"**/*.test.ts\""
+    "test": "tsx tests/node.ts"
   },
   "dependencies": {
     "@sinonjs/fake-timers": "^11.2.2",
