@@ -1,8 +1,11 @@
 import esbuild from "esbuild";
-import { findTests } from "../tests/util/findtests.ts";
+import { glob } from "glob";
 
 // NOTE: Script cwd should be project root.
-const files = await findTests();
+const files = await glob("**/*.test.ts", {
+  ignore: ["node_modules/**"],
+  posix: true,
+});
 const contents = files.map((file) => `import("./${file}");`).join("\n");
 const ctx = await esbuild.context({
   bundle: true,
