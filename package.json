@@ -21,6 +21,8 @@
     "tsx": "^4.11.0"
   },
   "imports": {
-    "#bdd": "./testutil/bdd.node.ts"
+    "#bdd": {
+      "node": "./tests/util/bdd.node.ts"
+    }
   }
 }

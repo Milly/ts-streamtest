@@ -8,7 +8,7 @@
     "./examples/upper-case": "./examples/upper_case.ts"
   },
   "tasks": {
-    "check": "deno lint && deno fmt --check && deno check *.ts errors/*.ts examples/*.ts",
+    "check": "deno lint && deno fmt --check && deno check *.ts errors/**/*.ts examples/**/*.ts tests/**/*.ts",
     "test": "deno test --allow-net --allow-read",
     "test:doc": "deno task test --doc",
     "test:coverage": "deno task coverage:clean && deno task test --parallel --shuffle --coverage=.coverage",
@@ -20,7 +20,7 @@
     "update:commit": "deno task update --commit --prefix 'chore:'"
   },
   "imports": {
-    "#bdd": "jsr:@std/testing@0.224.0/bdd",
+    "#bdd": "./tests/util/bdd.deno.ts",
     "@cross/env": "jsr:@cross/env@^1.0.2",
     "@cross/runtime": "jsr:@cross/runtime@^1.0.0",
     "@milly/streamtest": "./mod.ts",
@@ -44,7 +44,7 @@
       "**/*.test.ts",
       "package-lock.json",
       "package.json",
-      "testutil/",
+      "tests/",
       "tsconfig.json"
     ]
   },
