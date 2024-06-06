@@ -8,9 +8,10 @@ export function resetBaseTime(): void {
 }
 
 export function setupDebugLogger(): Logger {
-  const inspect = CurrentRuntime === "deno"
-    ? Deno.inspect
-    : (args: unknown) => JSON.stringify(args, null, 2);
+  const fallback = {
+    inspect: (args: unknown) => JSON.stringify(args, null, 2),
+  };
+  const { inspect } = CurrentRuntime === "deno" ? Deno : fallback;
   setup({
     handlers: {
       console: new ConsoleHandler("DEBUG", {

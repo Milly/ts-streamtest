@@ -6,6 +6,7 @@ const TEST_DONE: TestDone = "test-done";
 test("run tests", async ({ page }) => {
   const res = await page.goto("./");
   expect(res?.ok()).toBe(true);
+  expect(await page.$eval("title", (e) => e.textContent)).toBe("Browser Tests");
 
   await page.waitForEvent("console", async (msgs) => {
     const args = await Promise.all(msgs.args().map((v) => v.jsonValue()));

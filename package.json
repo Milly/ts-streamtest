@@ -6,7 +6,7 @@
   },
   "scripts": {
     "start": "tsx scripts/server.ts",
-    "test": "tsx tests/node.ts",
+    "test": "glob -x -c \"tsx --test --test-reporter=spec\" -i \"node_modules/**\" \"**/*.test.ts\"",
     "test:browser": "playwright test --config tests/browser/config.ts",
     "test:browser:chromium": "npm run test:browser -- --project chromium",
     "test:browser:firefox": "npm run test:browser -- --project firefox",

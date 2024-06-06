@@ -27,7 +27,7 @@ import type {
   TestStreamHelperRun,
   TestStreamHelperWritable,
 } from "./types.ts";
-import { deferred } from "./deferred.ts";
+import { deferred } from "./internal/deferred.ts";
 import { resetBaseTime, setupDebugLogger } from "./tests/util/logger.ts";
 import { from } from "./tests/util/from.ts";
 import { setLogger, testStream } from "./test_stream.ts";

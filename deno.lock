@@ -722,7 +722,12 @@
       }
     }
   },
-  "remote": {},
+  "redirects": {
+    "https://esm.sh/v135/@types/mocha@~10/index.d.ts": "https://esm.sh/v135/@types/mocha@10.0.6/index.d.ts"
+  },
+  "remote": {
+    "https://esm.sh/mocha@10.4.0": "e611dce5ff730800e58223d068fd4c783095598efcbd0ed15bdfd796d244cbb5"
+  },
   "workspace": {
     "dependencies": [
       "jsr:@cross/env@^1.0.2",

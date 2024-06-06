@@ -17,11 +17,7 @@ for (const file of FILES) {
 
 for (const file of FILES) {
   for await (const { codeBlock } of findCodeBlocks(file)) {
-    try {
-      await evalCode(codeBlock);
-    } catch {
-      // Do nothing.
-    }
+    await evalCode(codeBlock);
   }
 }
 
@@ -32,9 +28,9 @@ async function* findCodeBlocks(file: string) {
   let lastIndex = 0;
   for (const { 1: codeBlock, indices } of markdown.matchAll(codeReg)) {
     const [start, end] = indices![0];
-    const { 1: subject } =
-      ("\n" + markdown.slice(lastIndex, start)).match(/.*\n#+ ([^\n]+)/s) ??
-        { 1: "UNKNOWN" };
+    const prevSection = "\n" + markdown.slice(lastIndex, start);
+    const subjectMatch = prevSection.match(/.*\n(#+ [^\n]+)/s);
+    const { 1: subject } = { 1: "UNKNOWN", ...subjectMatch };
     lastIndex = end;
     yield { subject, codeBlock };
   }

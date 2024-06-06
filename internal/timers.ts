@@ -25,7 +25,10 @@ export const delayImmediate: () => Promise<void> = (() => {
 export class FakeTime implements Disposable {
   #clock = install({
     now: Date.now(),
-    toFake: Object.keys(timers) as FakeMethod[],
+    toFake: (Object.keys(timers) as FakeMethod[]).filter((m) =>
+      // NOTE: Mocking `nextTick` breaks `node --test`.
+      m !== "nextTick"
+    ),
   });
   #origMethods: [FakeMethod, unknown][] = [];
 
