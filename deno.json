@@ -38,8 +38,7 @@
     ],
     "exclude": [
       "scripts/",
-      "tests/browser/",
-      "tests/node.*"
+      "tests/browser/"
     ]
   },
   "publish": {
