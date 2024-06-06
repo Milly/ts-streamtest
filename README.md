@@ -2,8 +2,8 @@
 
 [![license:MIT](https://img.shields.io/github/license/Milly/ts-streamtest)](LICENSE)
 [![jsr](https://jsr.io/badges/@milly/streamtest)](https://jsr.io/@milly/streamtest)
-[![Test](https://github.com/Milly/ts-streamtest/workflows/Test/badge.svg)](https://github.com/Milly/ts-streamtest/actions?query=workflow%3ATest)
-[![codecov](https://codecov.io/gh/Milly/ts-streamtest/branch/master/graph/badge.svg?token=81L4DWDPIJ)](https://codecov.io/gh/Milly/ts-streamtest)
+[![Test](https://github.com/Milly/ts-streamtest/actions/workflows/test.yml/badge.svg)](https://github.com/Milly/ts-streamtest/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Milly/ts-streamtest/graph/badge.svg?token=81L4DWDPIJ)](https://codecov.io/gh/Milly/ts-streamtest)
 
 **streamtest** is a library for testing streams. Provides helper functions that
 make it easier to test streams with various scenarios and assertions.
