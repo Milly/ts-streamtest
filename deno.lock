@@ -9,7 +9,7 @@
       "jsr:@std/assert@1.0.1": "jsr:@std/assert@1.0.1",
       "jsr:@std/assert@^0.224.0": "jsr:@std/assert@0.224.0",
       "jsr:@std/assert@^0.225.1": "jsr:@std/assert@0.225.3",
-      "jsr:@std/async@0.224.1": "jsr:@std/async@0.224.1",
+      "jsr:@std/async@1.0.1": "jsr:@std/async@1.0.1",
       "jsr:@std/fmt@^0.224.0": "jsr:@std/fmt@0.224.0",
       "jsr:@std/fmt@^0.225.0": "jsr:@std/fmt@0.225.2",
       "jsr:@std/fs@^0.229.0": "jsr:@std/fs@0.229.1",
@@ -56,8 +56,8 @@
           "jsr:@std/internal@^1.0.1"
         ]
       },
-      "@std/async@0.224.1": {
-        "integrity": "2fda2c8151cc5811a6ca37fe825f1f71c95e02a374abb6ef868e0e19eca814a5"
+      "@std/async@1.0.1": {
+        "integrity": "3c7f6324a8a1b47ca657e5a349b511c9a6c2c0729e9d66b223c9ecaac0753ecb"
       },
       "@std/fmt@0.224.0": {
         "integrity": "e20e9a2312a8b5393272c26191c0a68eda8d2c4b08b046bad1673148f1d69851"
@@ -136,7 +136,7 @@
       "jsr:@cross/env@^1.0.2",
       "jsr:@cross/runtime@^1.0.0",
       "jsr:@std/assert@1.0.1",
-      "jsr:@std/async@0.224.1",
+      "jsr:@std/async@1.0.1",
       "jsr:@std/log@0.224.1",
       "jsr:@std/testing@0.224.0",
       "npm:@sinonjs/fake-timers@^11.2.2"
