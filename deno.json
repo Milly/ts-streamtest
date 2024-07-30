@@ -18,7 +18,7 @@
     "coverage": "deno coverage .coverage",
     "coverage:clean": "rm -rf .coverage",
     "pre-commit": "deno fmt && deno task -q check && deno task -q test:doc",
-    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io jsr:@molt/cli@0.18.4 deno.json test.json",
+    "update": "deno run --unstable-kv --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net=jsr.io,registry.npmjs.org jsr:@molt/cli@^0.19.0 deno.json",
     "update:commit": "deno task update --commit --prefix 'chore:'"
   },
   "imports": {
