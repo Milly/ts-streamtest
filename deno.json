@@ -7,8 +7,9 @@
     "./types": "./types.ts",
     "./examples/upper-case": "./examples/upper_case.ts"
   },
+  "nodeModulesDir": false,
   "tasks": {
-    "check": "deno lint && deno fmt --check && deno check *.ts errors/**/*.ts examples/**/*.ts scripts/**/*.ts tests/**/*.ts",
+    "check": "deno lint && deno fmt --check && deno check --no-lock *.ts errors/**/*.ts examples/**/*.ts scripts/**/*.ts tests/**/*.ts",
     "test": "deno test --allow-net --allow-read",
     "test:all": "deno task check && deno task test:doc && npm run test && npm run test:browser",
     "test:doc": "deno task test --doc",
