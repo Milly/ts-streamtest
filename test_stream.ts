@@ -5,7 +5,7 @@
  * @module
  */
 
-import { assertEquals } from "@std/assert/assert-equals";
+import { assertEquals } from "@std/assert/equals";
 import { AssertionError } from "@std/assert/assertion-error";
 import type { Logger } from "@std/log";
 import {

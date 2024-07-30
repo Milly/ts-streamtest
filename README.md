@@ -207,7 +207,7 @@ Deno.test("use assertReadable helper", async () => {
 Creates a `AbortSignal` with the specified `series`.
 
 ```typescript
-import { assertEquals } from "@std/assert/assert-equals";
+import { assertEquals } from "@std/assert/equals";
 import { delay } from "@std/async/delay";
 import { testStream } from "@milly/streamtest";
 
@@ -235,7 +235,7 @@ Deno.test("use abort helper", async () => {
 Process the test streams inside the `run` block.
 
 ```typescript
-import { assertEquals } from "@std/assert/assert-equals";
+import { assertEquals } from "@std/assert/equals";
 import { testStream } from "@milly/streamtest";
 import { UpperCase } from "@milly/streamtest/examples/upper-case";
 
