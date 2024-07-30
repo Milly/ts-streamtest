@@ -10,6 +10,7 @@
   "nodeModulesDir": false,
   "tasks": {
     "check": "deno lint && deno fmt --check && deno check --no-lock *.ts errors/**/*.ts examples/**/*.ts scripts/**/*.ts tests/**/*.ts",
+    "check:publish": "deno publish --dry-run",
     "test": "deno test --allow-net --allow-read",
     "test:all": "deno task check && deno task test:doc && npm run test && npm run test:browser",
     "test:doc": "deno task test --doc",
