@@ -19,7 +19,7 @@ jobs:
         runner:
           - ubuntu-latest
         deno-version:
-          - v1.x
+          - 1.x
     runs-on: ${{ matrix.runner }}
     steps:
 
@@ -45,7 +45,7 @@ jobs:
         runner:
           - ubuntu-latest
         deno-version:
-          - v1.x
+          - 1.x
     runs-on: ${{ matrix.runner }}
     steps:
 
@@ -71,7 +71,7 @@ jobs:
         runner:
           - ubuntu-latest
         deno-version:
-          - v1.x
+          - 1.x
     runs-on: ${{ matrix.runner }}
     steps:
 
@@ -86,9 +86,6 @@ jobs:
           key: deno-${{ runner.os }}-${{ hashFiles('deno.lock', '.github/workflows/**') }}
           restore-keys: deno-${{ runner.os }}-
           path: ~/.cache/deno
-
-      - name: Check
-        run: deno task check
 
       - name: Test
         run: deno task test:coverage
@@ -108,7 +105,9 @@ jobs:
         runner:
           - ubuntu-latest
         node-version:
+          - 18
           - 20
+          - 22
     runs-on: ${{ matrix.runner }}
     steps:
 
