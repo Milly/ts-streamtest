@@ -8,8 +8,6 @@ import {
 } from "@std/assert";
 import { delayImmediate, FakeTime } from "./timers.ts";
 
-const origSetTimeout = setTimeout;
-
 describe("delayImmediate()", () => {
   it("should resolves all microtasks", async () => {
     const logs: string[] = [];
@@ -34,6 +32,7 @@ describe("delayImmediate()", () => {
 });
 
 describe("new FakeTime()", () => {
+  const origSetTimeout = setTimeout;
   it("should create instance of `FakeTime`", () => {
     const actual = new FakeTime();
     actual.restore();
@@ -48,8 +47,11 @@ describe("new FakeTime()", () => {
   });
 });
 describe("FakeTime", () => {
+  // deno-lint-ignore no-explicit-any
+  let origSetTimeout: (...args: any[]) => unknown;
   let instance: FakeTime;
   beforeEach(() => {
+    origSetTimeout = setTimeout;
     instance = new FakeTime();
   });
   afterEach(() => {
