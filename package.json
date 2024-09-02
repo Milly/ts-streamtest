@@ -22,7 +22,7 @@
     "@cross/runtime": "npm:@jsr/cross__runtime@^1.0.0",
     "@playwright/test": "^1.45.3",
     "@std/async": "npm:@jsr/std__async@^1.0.1",
-    "@std/testing": "npm:@jsr/std__testing@^0.225.3",
+    "@std/testing": "npm:@jsr/std__testing@^1.0.1",
     "esbuild": "^0.21.5",
     "glob": "^10.4.5",
     "tsx": "^4.16.2"
