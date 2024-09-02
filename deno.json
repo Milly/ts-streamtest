@@ -28,7 +28,7 @@
     "@cross/runtime": "jsr:@cross/runtime@^1.0.0",
     "@milly/streamtest": "./mod.ts",
     "@milly/streamtest/examples/upper-case": "./examples/upper_case.ts",
-    "@sinonjs/fake-timers": "npm:@sinonjs/fake-timers@^11.2.2",
+    "@sinonjs/fake-timers": "npm:@sinonjs/fake-timers@^13.0.1",
     "@std/assert": "jsr:@std/assert@^1.0.1",
     "@std/async": "jsr:@std/async@^1.0.1",
     "@std/log": "jsr:@std/log@^0.224.5",

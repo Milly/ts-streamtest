@@ -13,7 +13,7 @@
     "test:browser:webkit": "npm run test:browser -- --project webkit"
   },
   "dependencies": {
-    "@sinonjs/fake-timers": "^11.2.2",
+    "@sinonjs/fake-timers": "^13.0.1",
     "@std/assert": "npm:@jsr/std__assert@^1.0.1",
     "@std/log": "npm:@jsr/std__log@^0.224.5"
   },

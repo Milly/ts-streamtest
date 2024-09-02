@@ -14,7 +14,7 @@
       "jsr:@std/io@^0.224.6": "jsr:@std/io@0.224.6",
       "jsr:@std/log@^0.224.5": "jsr:@std/log@0.224.6",
       "jsr:@std/testing@^1.0.1": "jsr:@std/testing@1.0.1",
-      "npm:@sinonjs/fake-timers@^11.2.2": "npm:@sinonjs/fake-timers@11.3.1",
+      "npm:@sinonjs/fake-timers@^13.0.1": "npm:@sinonjs/fake-timers@13.0.1",
       "npm:@types/mocha": "npm:@types/mocha@10.0.7",
       "npm:@types/node": "npm:@types/node@18.16.19",
       "npm:@types/sinonjs__fake-timers@^8.1.5": "npm:@types/sinonjs__fake-timers@8.1.5"
@@ -76,8 +76,8 @@
           "type-detect": "type-detect@4.0.8"
         }
       },
-      "@sinonjs/fake-timers@11.3.1": {
-        "integrity": "sha512-EVJO7nW5M/F5Tur0Rf2z/QoMo+1Ia963RiMtapiQrEWvY0iBUvADo8Beegwjpnle5BHkyHuoxSTW3jF43H1XRA==",
+      "@sinonjs/fake-timers@13.0.1": {
+        "integrity": "sha512-ZEbLYOvZQHccQJzbg2E5r+/Mdjb6BMdjToL4r8WwUw0VTjTnyY3gCnwLeiovcXI3/Uo25exmqmiwsjL/eE/rSg==",
         "dependencies": {
           "@sinonjs/commons": "@sinonjs/commons@3.0.1"
         }
@@ -109,7 +109,7 @@
       "jsr:@std/async@^1.0.1",
       "jsr:@std/log@^0.224.5",
       "jsr:@std/testing@^1.0.1",
-      "npm:@sinonjs/fake-timers@^11.2.2"
+      "npm:@sinonjs/fake-timers@^13.0.1"
     ],
     "packageJson": {
       "dependencies": [
@@ -120,7 +120,7 @@
         "npm:@jsr/std__log@^0.224.5",
         "npm:@jsr/std__testing@^1.0.1",
         "npm:@playwright/test@^1.45.3",
-        "npm:@sinonjs/fake-timers@^11.2.2",
+        "npm:@sinonjs/fake-timers@^13.0.1",
         "npm:esbuild@^0.21.5",
         "npm:glob@^10.4.5",
         "npm:tsx@^4.16.2"
