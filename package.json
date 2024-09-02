@@ -13,7 +13,7 @@
     "test:browser:webkit": "npm run test:browser -- --project webkit"
   },
   "dependencies": {
-    "@sinonjs/fake-timers": "^11.2.2",
+    "@sinonjs/fake-timers": "^13.0.1",
     "@std/assert": "npm:@jsr/std__assert@^1.0.1",
     "@std/log": "npm:@jsr/std__log@^0.224.5"
   },
@@ -22,7 +22,7 @@
     "@cross/runtime": "npm:@jsr/cross__runtime@^1.0.0",
     "@playwright/test": "^1.45.3",
     "@std/async": "npm:@jsr/std__async@^1.0.1",
-    "@std/testing": "npm:@jsr/std__testing@^0.225.3",
+    "@std/testing": "npm:@jsr/std__testing@^1.0.1",
     "esbuild": "^0.21.5",
     "glob": "^10.4.5",
     "tsx": "^4.16.2"
