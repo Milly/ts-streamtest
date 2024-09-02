@@ -4,18 +4,18 @@
     "specifiers": {
       "jsr:@cross/deepmerge@^1.0.0": "jsr:@cross/deepmerge@1.0.0",
       "jsr:@cross/env@^1.0.2": "jsr:@cross/env@1.0.2",
-      "jsr:@cross/runtime@^1.0.0": "jsr:@cross/runtime@1.0.0",
+      "jsr:@cross/runtime@^1.0.0": "jsr:@cross/runtime@1.1.0",
       "jsr:@std/assert@1.0.0-rc.2": "jsr:@std/assert@1.0.0-rc.2",
-      "jsr:@std/assert@^1.0.1": "jsr:@std/assert@1.0.1",
-      "jsr:@std/async@^1.0.1": "jsr:@std/async@1.0.1",
-      "jsr:@std/fmt@^1.0.0-rc.1": "jsr:@std/fmt@1.0.0-rc.1",
-      "jsr:@std/fs@^1.0.0-rc.5": "jsr:@std/fs@1.0.0",
-      "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.1",
-      "jsr:@std/internal@^1.0.1": "jsr:@std/internal@1.0.1",
-      "jsr:@std/io@^0.224.3": "jsr:@std/io@0.224.3",
+      "jsr:@std/assert@^1.0.1": "jsr:@std/assert@1.0.3",
+      "jsr:@std/async@^1.0.1": "jsr:@std/async@1.0.4",
+      "jsr:@std/fmt@^1.0.0-rc.1": "jsr:@std/fmt@1.0.1",
+      "jsr:@std/fs@^1.0.0-rc.5": "jsr:@std/fs@1.0.2",
+      "jsr:@std/internal@^1.0.0": "jsr:@std/internal@1.0.2",
+      "jsr:@std/internal@^1.0.2": "jsr:@std/internal@1.0.2",
+      "jsr:@std/io@^0.224.3": "jsr:@std/io@0.224.6",
       "jsr:@std/log@0.224.5": "jsr:@std/log@0.224.5",
       "jsr:@std/testing@0.225.3": "jsr:@std/testing@0.225.3",
-      "npm:@sinonjs/fake-timers@^11.2.2": "npm:@sinonjs/fake-timers@11.2.2",
+      "npm:@sinonjs/fake-timers@^11.2.2": "npm:@sinonjs/fake-timers@11.3.1",
       "npm:@types/mocha": "npm:@types/mocha@10.0.7",
       "npm:@types/node": "npm:@types/node@18.16.19",
       "npm:@types/sinonjs__fake-timers@^8.1.5": "npm:@types/sinonjs__fake-timers@8.1.5"
@@ -31,8 +31,8 @@
           "jsr:@cross/runtime@^1.0.0"
         ]
       },
-      "@cross/runtime@1.0.0": {
-        "integrity": "dddecdf99182df13d50279d1e473f715e83d41961c5c22edd7bb0c4c3cf8a76a"
+      "@cross/runtime@1.1.0": {
+        "integrity": "f35a3b768a9de125277329483b684062ffc9ee86f4449cb8b3d614adcad64ffb"
       },
       "@std/assert@1.0.0-rc.2": {
         "integrity": "0484eab1d76b55fca1c3beaff485a274e67dd3b9f065edcbe70030dfc0b964d3",
@@ -40,26 +40,26 @@
           "jsr:@std/internal@^1.0.0"
         ]
       },
-      "@std/assert@1.0.1": {
-        "integrity": "13590ef8e5854f59e4ad252fd987e83239a1bf1f16cb9c69c1d123ebb807a75b",
+      "@std/assert@1.0.3": {
+        "integrity": "b0d03ce1ced880df67132eea140623010d415848df66f6aa5df76507ca7c26d8",
         "dependencies": [
-          "jsr:@std/internal@^1.0.1"
+          "jsr:@std/internal@^1.0.2"
         ]
       },
-      "@std/async@1.0.1": {
-        "integrity": "3c7f6324a8a1b47ca657e5a349b511c9a6c2c0729e9d66b223c9ecaac0753ecb"
+      "@std/async@1.0.4": {
+        "integrity": "373f5168a01b46ecaabc785d4e0f9ef18a010ab867af069fb905d93a9129ae5b"
       },
-      "@std/fmt@1.0.0-rc.1": {
-        "integrity": "3dbbd12f1704c62b5bd33c9ff928c8df47cd5c75f6637201a8c21298b28e43bc"
+      "@std/fmt@1.0.1": {
+        "integrity": "ef76c37faa7720faa8c20fd8cc74583f9b1e356dfd630c8714baa716a45856ab"
       },
-      "@std/fs@1.0.0": {
-        "integrity": "d72e4a125af7168d717a2ed1dca77a728b422b0d138fd20579e3fa41a77da943"
+      "@std/fs@1.0.2": {
+        "integrity": "af57555c7a224a6f147d5cced5404692974f7a628ced8eda67e0d22d92d474ec"
       },
-      "@std/internal@1.0.1": {
-        "integrity": "6f8c7544d06a11dd256c8d6ba54b11ed870aac6c5aeafff499892662c57673e6"
+      "@std/internal@1.0.2": {
+        "integrity": "f4cabe2021352e8bfc24e6569700df87bf070914fc38d4b23eddd20108ac4495"
       },
-      "@std/io@0.224.3": {
-        "integrity": "b402edeb99c6b3778d9ae3e9927bc9085b170b41e5a09bbb7064ab2ee394ae2f"
+      "@std/io@0.224.6": {
+        "integrity": "eefe034a370be34daf066c8634dd645635d099bb21eccf110f0bdc28d9040891"
       },
       "@std/log@0.224.5": {
         "integrity": "4612a45189438441bbd923a4cad1cce5c44c6c4a039195a3e8d831ce38894eee",
@@ -83,8 +83,8 @@
           "type-detect": "type-detect@4.0.8"
         }
       },
-      "@sinonjs/fake-timers@11.2.2": {
-        "integrity": "sha512-G2piCSxQ7oWOxwGSAyFHfPIsyeJGXYtc6mFbnFA+kRXkiEnTl8c/8jul2S329iFBnDI9HGoeWWAZvuvOkZccgw==",
+      "@sinonjs/fake-timers@11.3.1": {
+        "integrity": "sha512-EVJO7nW5M/F5Tur0Rf2z/QoMo+1Ia963RiMtapiQrEWvY0iBUvADo8Beegwjpnle5BHkyHuoxSTW3jF43H1XRA==",
         "dependencies": {
           "@sinonjs/commons": "@sinonjs/commons@3.0.1"
         }
