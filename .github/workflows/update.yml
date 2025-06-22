@@ -47,6 +47,7 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           title: "Security Update"
+          commit-message: "deps: bump version for security fixes"
           branch: automation/security-fix
           labels: automation
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
