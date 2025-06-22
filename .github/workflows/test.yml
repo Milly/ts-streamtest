@@ -32,7 +32,7 @@ jobs:
         if: matrix.deno.remove-lock == true
         run: rm -f deno.lock
 
-      - uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ matrix.deno.version }}
 
@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ matrix.deno.version }}
 
@@ -91,7 +91,7 @@ jobs:
         if: matrix.deno.remove-lock == true
         run: rm -f deno.lock
 
-      - uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ matrix.deno.version }}
 
