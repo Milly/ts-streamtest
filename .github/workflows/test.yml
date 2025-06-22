@@ -107,9 +107,10 @@ jobs:
         runner:
           - ubuntu-latest
         node-version:
-          - 18
           - 20
           - 22
+          - 24
+          - "lts/*"
     runs-on: ${{ matrix.runner }}
     steps:
 
