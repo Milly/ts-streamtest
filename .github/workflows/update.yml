@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hasundue/molt-action@v1
+      - uses: denoland/setup-deno@v2
         with:
           source: deno.json
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
