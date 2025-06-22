@@ -1,6 +1,12 @@
 /// <reference lib="dom" />
 /// <reference types="npm:@types/mocha" />
 
+declare global {
+  interface Window {
+    mocha: BrowserMocha;
+  }
+}
+
 const TESTS_SOURCE = "./stdin.js";
 
 const TEST_DONE = "test-done";
@@ -11,10 +17,6 @@ export type TestGlobal = { testResult?: TestResult };
 
 let errors = 0;
 try {
-  const { default: mocha } = await import("https://esm.sh/mocha@10.4.0") as {
-    default: BrowserMocha;
-  };
-
   mocha.setup({
     ui: "bdd",
     reporter: "spec",
