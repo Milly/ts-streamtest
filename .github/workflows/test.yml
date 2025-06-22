@@ -20,11 +20,17 @@ jobs:
           - ubuntu-latest
         deno:
           - version: 1.x
+            # Remove lock file for Deno 1.x
+            remove-lock: true
           - version: 2.x
     runs-on: ${{ matrix.runner }}
     steps:
 
       - uses: actions/checkout@v4
+
+      - name: Remove deno.lock
+        if: matrix.deno.remove-lock == true
+        run: rm -f deno.lock
 
       - uses: denoland/setup-deno@v1
         with:
@@ -73,11 +79,17 @@ jobs:
           - ubuntu-latest
         deno:
           - version: 1.x
+            # Remove lock file for Deno 1.x
+            remove-lock: true
           - version: 2.x
     runs-on: ${{ matrix.runner }}
     steps:
 
       - uses: actions/checkout@v4
+
+      - name: Remove deno.lock
+        if: matrix.deno.remove-lock == true
+        run: rm -f deno.lock
 
       - uses: denoland/setup-deno@v1
         with:
